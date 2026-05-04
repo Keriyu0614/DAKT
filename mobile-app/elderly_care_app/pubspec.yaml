@@ -1,0 +1,33 @@
+name: elderly_care_app
+description: Elderly Care Reminder System — Mobile App
+
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  http: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  # To use Google Fonts — add Nunito as asset or via google_fonts package
+  # fonts:
+  #   - family: Nunito
+  #     fonts:
+  #       - asset: fonts/Nunito-Regular.ttf
+  #       - asset: fonts/Nunito-Bold.ttf
+  #         weight: 700
+  #       - asset: fonts/Nunito-ExtraBold.ttf
+  #         weight: 800
