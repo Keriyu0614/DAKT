@@ -26,6 +26,24 @@ class AuthService {
     }
   }
 
+  static Future<bool> loginAsGuest() async {
+    try {
+      // Create a dummy guest user for demo/testing
+      currentUser = UserModel(
+        userId: 'guest-id',
+        name: 'Khách',
+        email: 'guest@example.com',
+        role: 'Elderly',
+        token: 'demo-token-guest',
+      );
+      ApiService.setToken(currentUser!.token);
+      return true;
+    } catch (e) {
+      print('Guest login error: $e');
+      return false;
+    }
+  }
+
   static Future<bool> register(String name, String email, String password) async {
     try {
       final response = await ApiService.post('auth/register', {

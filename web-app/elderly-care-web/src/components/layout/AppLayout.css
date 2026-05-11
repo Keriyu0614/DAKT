@@ -1,6 +1,6 @@
 .app-container {
     min-height: 100vh;
-    background-color: #f5f7fa;
+    background-color: #f0f6ff;
     display: flex;
     flex-direction: column;
 }
@@ -12,6 +12,7 @@
 
 .app-main {
     flex: 1;
-    padding: 30px;
+    padding: 28px 32px;
     overflow-y: auto;
+    background: #f0f6ff;
 }

@@ -1,78 +1,217 @@
-/* HealthPage.css */
+/* HealthPage.css - Redesigned */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-    --hp-primary-blue: #2563eb;
-    --hp-primary-light: #eff6ff;
-    --hp-success: #22c55e;
+    --hp-primary-blue: #0ea5e9;
+    --hp-primary-light: #e0f2fe;
+    --hp-success: #10b981;
     --hp-success-bg: #f0fdf4;
-    --hp-warning: #eab308;
-    --hp-warning-bg: #fefce8;
+    --hp-warning: #f59e0b;
+    --hp-warning-bg: #fffbeb;
     --hp-critical: #ef4444;
     --hp-critical-bg: #fef2f2;
-    --hp-text-main: #1e293b;
+    --hp-text-main: #0f172a;
     --hp-text-muted: #64748b;
     --hp-border: #e2e8f0;
-    --hp-card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --hp-card-shadow: 0 2px 10px rgba(15, 23, 42, 0.07);
 }
 
 .health-page-container {
     max-width: 1000px;
     margin: 0 auto;
-    padding: 2rem;
+    padding: 2rem 2.5rem;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
     color: var(--hp-text-main);
+    padding-bottom: 5rem;
 }
 
 /* Header */
 .health-header {
-    margin-bottom: 2.5rem;
-    border-bottom: 2px solid var(--hp-border);
-    padding-bottom: 1.5rem;
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    border-radius: 20px;
+    padding: 2rem 2.5rem;
+    margin-bottom: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.health-header::before {
+    content: '❤';
+    position: absolute;
+    right: 2rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 5rem;
+    opacity: 0.12;
+    pointer-events: none;
 }
 
 .health-header h1 {
-    font-size: 2.5rem;
-    color: var(--hp-primary-blue);
-    margin-bottom: 0.5rem;
+    font-size: 1.7rem;
+    color: white;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 0.3rem;
 }
 
 .health-header p {
-    font-size: 1.125rem;
-    color: var(--hp-text-muted);
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.88);
 }
 
-/* Section Common */
+/* Error Inline */
+.error-view-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+    padding: 0.9rem 1.25rem;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* Content */
+.health-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Sections */
 .health-section {
     background: white;
-    border-radius: 1rem;
-    padding: 2rem;
-    margin-bottom: 2rem;
+    border-radius: 16px;
+    padding: 1.75rem;
     box-shadow: var(--hp-card-shadow);
     border: 1px solid var(--hp-border);
 }
 
 .section-title {
-    font-size: 1.5rem;
-    margin-bottom: 1.5rem;
+    font-size: 1.05rem;
+    margin-bottom: 1.25rem;
     font-weight: 700;
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.6rem;
+    color: var(--hp-text-main);
 }
 
-/* Status Cards */
+.section-title svg {
+    color: var(--hp-primary-blue);
+}
+
+/* Status Grid */
 .status-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
 }
 
-.status-card {
-    padding: 1.5rem;
-    border-radius: 0.75rem;
-    border-left: 6px solid var(--hp-border);
+/* Trends Header */
+.trends-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.trends-header .section-title {
+    margin-bottom: 0;
+}
+
+.metric-toggles {
+    display: flex;
+    gap: 6px;
+}
+
+.metric-toggle {
+    padding: 6px 14px;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    border: 2px solid var(--hp-border);
+    background: white;
+    color: var(--hp-text-muted);
+    transition: all 0.18s;
+    font-family: inherit;
+}
+
+.metric-toggle:hover {
+    border-color: var(--hp-primary-blue);
+    color: var(--hp-primary-blue);
+}
+
+.metric-toggle.active {
+    background: var(--hp-primary-blue);
+    border-color: var(--hp-primary-blue);
+    color: white;
+    box-shadow: 0 3px 10px rgba(14, 165, 233, 0.3);
+}
+
+/* History */
+.history-list {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
+}
+
+/* Empty Text */
+.empty-text {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.9rem;
+    padding: 2rem;
+    font-style: italic;
+}
+
+/* FAB - Add Button */
+.add-log-trigger {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 0.85rem 1.75rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    transition: all 0.2s;
+    z-index: 50;
+}
+
+.add-log-trigger:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(239, 68, 68, 0.5);
+}
+
+/* Status Cards */
+.status-card {
+    padding: 1.25rem 1.5rem;
+    border-radius: 14px;
+    border-left: 5px solid var(--hp-border);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    transition: all 0.2s;
+}
+
+.status-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
 }
 
 .status-card.normal {
@@ -90,191 +229,29 @@
     background-color: var(--hp-critical-bg);
 }
 
-.status-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: var(--hp-text-muted);
-    font-weight: 600;
-}
-
-.status-value {
-    font-size: 2.25rem;
-    font-weight: 800;
-    color: var(--hp-text-main);
-}
-
-.status-unit {
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--hp-text-muted);
-    margin-left: 0.25rem;
-}
-
-/* Trends Section */
-.trends-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
-
-.metric-toggles {
-    display: flex;
-    gap: 0.5rem;
-    background: var(--hp-primary-light);
-    padding: 0.25rem;
-    border-radius: 0.5rem;
-}
-
-.metric-toggle {
-    padding: 0.5rem 1rem;
-    border: none;
-    background: transparent;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s;
-}
-
-.metric-toggle.active {
-    background: white;
-    color: var(--hp-primary-blue);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-/* History List */
-.history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.history-item {
-    display: flex;
-    align-items: flex-start;
-    padding: 1.25rem;
-    border: 1px solid var(--hp-border);
-    border-radius: 0.75rem;
-    gap: 1.5rem;
-}
-
-.history-item:hover {
-    border-color: var(--hp-primary-blue);
-}
-
-.history-date {
-    min-width: 120px;
-    text-align: right;
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: var(--hp-text-muted);
-}
-
-.history-metrics {
-    flex: 1;
-    display: flex;
-    gap: 2rem;
-    flex-wrap: wrap;
-}
-
-.history-metric {
-    display: flex;
-    flex-direction: column;
-}
-
-.history-metric-label {
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    color: var(--hp-text-muted);
-    font-weight: 700;
-}
-
-.history-metric-value {
-    font-size: 1.125rem;
-    font-weight: 700;
-}
-
-.history-metric-value.normal {
-    color: var(--hp-success);
-}
-
-.history-metric-value.attention {
-    color: var(--hp-warning);
-}
-
-.history-metric-value.critical {
-    color: var(--hp-critical);
-}
-
-.history-note {
-    font-size: 0.9rem;
-    padding-top: 0.5rem;
-    margin-top: 0.5rem;
-    border-top: 1px dashed var(--hp-border);
-    width: 100%;
-    font-style: italic;
-    color: var(--hp-text-muted);
-}
-
-/* Add Log Section */
-.add-log-trigger {
-    position: fixed;
-    bottom: 2rem;
-    right: 2rem;
-    background: var(--hp-primary-blue);
-    color: white;
-    border: none;
-    padding: 1rem 1.5rem;
-    border-radius: 9999px;
-    font-weight: 700;
-    font-size: 1.125rem;
-    cursor: pointer;
-    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: transform 0.2s;
-    z-index: 100;
-}
-
-.add-log-trigger:hover {
-    transform: translateY(-2px);
-    background: #1d4ed8;
-}
-
-/* Inline Error */
-.error-view-inline {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-    background: #fee2e2;
-    border-radius: 0.5rem;
-    color: #991b1b;
-    margin-bottom: 2rem;
-}
-
-.empty-text {
-    text-align: center;
-    color: #94a3b8;
-    font-size: 16px;
-    padding: 2rem 0;
-    font-style: italic;
-}
-
-@media (max-width: 640px) {
+@media (max-width: 768px) {
     .health-page-container {
-        padding: 1rem;
+        padding: 1rem 1.25rem;
     }
 
-    .history-item {
-        flex-direction: column;
-        gap: 0.75rem;
+    .health-header {
+        padding: 1.5rem;
     }
 
-    .history-date {
-        text-align: left;
-        min-width: auto;
+    .health-header h1 {
+        font-size: 1.4rem;
+    }
+
+    .health-section {
+        padding: 1.25rem;
+    }
+
+    .add-log-trigger {
+        bottom: 1.5rem;
+        right: 1.5rem;
+    }
+
+    .status-grid {
+        grid-template-columns: 1fr;
     }
 }

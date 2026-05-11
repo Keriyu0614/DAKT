@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _animController.dispose();
-    _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -68,6 +68,20 @@ class _LoginScreenState extends State<LoginScreen>
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.')),
+        );
+      }
+    }
+  }
+
+  void _loginAsGuest() async {
+    setState(() => _isLoading = true);
+    final success = await AuthService.loginAsGuest();
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (success) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       }
     }
@@ -238,6 +252,34 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                 )
                               : const Text('Đăng nhập'),
+                        ),
+                        const SizedBox(height: 16),
+                        
+                        // Skip Login button
+                        OutlinedButton(
+                          onPressed: _isLoading ? null : _loginAsGuest,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            side: const BorderSide(color: AppTheme.border),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.person_outline_rounded, color: AppTheme.textSecondary),
+                              SizedBox(width: 12),
+                              Text(
+                                'Bỏ qua đăng nhập',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { medicationService } from '../../services/medication.service';
 import { type Medication } from '../../api/medication.api';
 import MedicationCard from '../../components/medication/MedicationCard';
@@ -15,6 +16,7 @@ import {
 import { toast } from 'react-toastify';
 
 export const MedicationsPage = () => {
+    const { t } = useTranslation();
     // --- State ---
     const [medications, setMedications] = useState<Medication[]>([]);
     const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export const MedicationsPage = () => {
             setError('');
         } catch (err) {
             console.error(err);
-            setError('Failed to load medications.');
+            setError(t('loading_meds_error') || 'Failed to load medications.');
         } finally {
             setLoading(false);
         }
@@ -92,20 +94,20 @@ export const MedicationsPage = () => {
     };
 
     // --- Render ---
-    if (loading) return <div className="loading-view">Loading Medications...</div>;
+    if (loading) return <div className="loading-view">{t('loading_meds')}</div>;
 
     return (
         <div className="medications-container">
             {/* Header */}
             <header className="medications-header">
-                <h1><Pill size={32} /> Medication Management</h1>
-                <p>Track your prescriptions, manage dosages, and control your reminder schedule.</p>
+                <h1><Pill size={32} /> {t('medications_title')}</h1>
+                <p>{t('medications_sub')}</p>
             </header>
 
             {/* Actions */}
             <div className="actions-bar">
                 <button className="btn-add-med" onClick={() => handleOpenForm()}>
-                    <Plus size={20} /> Add New Medication
+                    <Plus size={20} /> {t('add_medication')}
                 </button>
             </div>
 
@@ -115,13 +117,13 @@ export const MedicationsPage = () => {
             <section className="medication-group">
                 <div className="group-title">
                     <CheckCircle2 size={24} className="text-green-600" />
-                    Active Medications ({groupedMeds.active.length})
+                    {t('active_medications')} ({groupedMeds.active.length})
                 </div>
 
                 {groupedMeds.active.length === 0 ? (
                     <div className="empty-state">
                         <Pill size={48} style={{ opacity: 0.2 }} />
-                        <p>No active medications.</p>
+                        <p>{t('no_active_meds')}</p>
                     </div>
                 ) : (
                     <div className="medication-grid">
@@ -142,7 +144,7 @@ export const MedicationsPage = () => {
                 <section className="medication-group">
                     <div className="group-title">
                         <PauseCircle size={24} className="text-gray-500" />
-                        Paused Medications ({groupedMeds.paused.length})
+                        {t('paused_medications')} ({groupedMeds.paused.length})
                     </div>
                     <div className="medication-grid">
                         {groupedMeds.paused.map(med => (
@@ -168,7 +170,7 @@ export const MedicationsPage = () => {
                         onClick={() => setIsCompletedCollapsed(!isCompletedCollapsed)}
                     >
                         <CheckCircle2 size={24} className="text-gray-400" />
-                        Completed History ({groupedMeds.completed.length})
+                        {t('completed_history')} ({groupedMeds.completed.length})
                         {isCompletedCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
                     </div>
                     {!isCompletedCollapsed && (

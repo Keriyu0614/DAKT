@@ -22,7 +22,7 @@ const getOffsetDate = (days: number, hours = 0) => {
 
 let mockAppointments: Appointment[] = [
     {
-        id: 'appt-1',
+        id: '00000000-0000-0000-0000-000000000201',
         doctorName: 'Dr. Sarah Wilson',
         specialty: 'Cardiology',
         dateTime: getOffsetDate(-5), // 5 days ago
@@ -31,7 +31,7 @@ let mockAppointments: Appointment[] = [
         status: 'completed'
     },
     {
-        id: 'appt-2',
+        id: '00000000-0000-0000-0000-000000000202',
         doctorName: 'Dr. James Chen',
         specialty: 'General Practice',
         dateTime: getOffsetDate(0, 2), // Today, in 2 hours
@@ -40,7 +40,7 @@ let mockAppointments: Appointment[] = [
         status: 'upcoming'
     },
     {
-        id: 'appt-3',
+        id: '00000000-0000-0000-0000-000000000203',
         doctorName: 'Dr. Emily Brown',
         specialty: 'Dentist',
         dateTime: getOffsetDate(3), // In 3 days
@@ -49,7 +49,7 @@ let mockAppointments: Appointment[] = [
         status: 'upcoming'
     },
     {
-        id: 'appt-4',
+        id: '00000000-0000-0000-0000-000000000204',
         doctorName: 'Dr. Robert Miller',
         specialty: 'Optometrist',
         dateTime: getOffsetDate(7), // In 7 days
@@ -58,7 +58,7 @@ let mockAppointments: Appointment[] = [
         status: 'upcoming'
     },
     {
-        id: 'appt-5',
+        id: '00000000-0000-0000-0000-000000000205',
         doctorName: 'Dr. Sarah Wilson',
         specialty: 'Cardiology',
         dateTime: getOffsetDate(-14), // 14 days ago
@@ -67,7 +67,7 @@ let mockAppointments: Appointment[] = [
         status: 'completed'
     },
     {
-        id: 'appt-6',
+        id: '00000000-0000-0000-0000-000000000206',
         doctorName: 'Dr. Maria Garcia',
         specialty: 'Physiotherapy',
         dateTime: getOffsetDate(10), // In 10 days
@@ -76,7 +76,7 @@ let mockAppointments: Appointment[] = [
         status: 'upcoming'
     },
     {
-        id: 'appt-7',
+        id: '00000000-0000-0000-0000-000000000207',
         doctorName: 'Dr. James Chen',
         specialty: 'General Practice',
         dateTime: getOffsetDate(-2), // 2 days ago
@@ -85,7 +85,7 @@ let mockAppointments: Appointment[] = [
         status: 'cancelled'
     },
     {
-        id: 'appt-8',
+        id: '00000000-0000-0000-0000-000000000208',
         doctorName: 'Specialist Clinic',
         specialty: 'Dermatology',
         dateTime: getOffsetDate(14), // In 14 days
@@ -102,7 +102,7 @@ export const appointmentMockService = {
 
     create: async (payload: CreateAppointmentPayload) => {
         const newAppt: Appointment = {
-            id: `appt-${Date.now()}`,
+            id: crypto.randomUUID(),
             doctorName: payload.doctorName,
             specialty: payload.specialty || 'General',
             dateTime: payload.appointmentDate,

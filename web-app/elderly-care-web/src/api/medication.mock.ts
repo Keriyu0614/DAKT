@@ -6,7 +6,7 @@ const MOCK_USER_ID = '00000000-0000-0000-0000-000000000001';
 // Initial Mock Data (Refactored to meet strict dataset requirements)
 let mockMedications: Medication[] = [
     {
-        id: 'med-1',
+        id: '00000000-0000-0000-0000-000000000101',
         userId: MOCK_USER_ID,
         name: 'Lisinopril',
         form: 'Tablet',
@@ -20,7 +20,7 @@ let mockMedications: Medication[] = [
         updatedAt: new Date().toISOString()
     },
     {
-        id: 'med-2',
+        id: '00000000-0000-0000-0000-000000000102',
         userId: MOCK_USER_ID,
         name: 'Amoxicillin',
         form: 'Capsule',
@@ -34,7 +34,7 @@ let mockMedications: Medication[] = [
         updatedAt: new Date().toISOString()
     },
     {
-        id: 'med-3',
+        id: '00000000-0000-0000-0000-000000000103',
         userId: MOCK_USER_ID,
         name: 'Metformin',
         form: 'Tablet',
@@ -48,7 +48,7 @@ let mockMedications: Medication[] = [
         updatedAt: new Date().toISOString()
     },
     {
-        id: 'med-4',
+        id: '00000000-0000-0000-0000-000000000104',
         userId: MOCK_USER_ID,
         name: 'Vitamin D3',
         form: 'Capsule',
@@ -63,7 +63,7 @@ let mockMedications: Medication[] = [
         updatedAt: new Date().toISOString()
     },
     {
-        id: 'med-5',
+        id: '00000000-0000-0000-0000-000000000105',
         userId: MOCK_USER_ID,
         name: 'Omega-3',
         form: 'Liquid',

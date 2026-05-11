@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import authApi from '../../api/auth.api';
+import { GoogleLogin, type CredentialResponse } from "@react-oauth/google";
+import { useAuth } from "../../context/AuthContext";
+import { toast } from "react-toastify";
 
 export const RegisterPage = () => {
     const navigate = useNavigate();
+    const { login } = useAuth();
 
     // State
     const [formData, setFormData] = useState({
@@ -66,6 +70,23 @@ export const RegisterPage = () => {
 
     const handleBackToLogin = () => {
         navigate('/login');
+    };
+
+    const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+        if (!credentialResponse.credential) return;
+
+        try {
+            setLoading(true);
+            const response = await authApi.googleLogin(credentialResponse.credential);
+            login(response.data);
+            navigate("/app");
+            toast.success("Logged in with Google!");
+        } catch (err: any) {
+            console.error(err);
+            toast.error("Google login failed");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -146,6 +167,22 @@ export const RegisterPage = () => {
                         {loading ? 'Creating Account...' : 'Register'}
                     </button>
                 </form>
+
+                <div style={styles.divider}>
+                    <span style={styles.dividerLine}></span>
+                    <span style={styles.dividerText}>OR</span>
+                    <span style={styles.dividerLine}></span>
+                </div>
+
+                <div style={styles.googleWrapper}>
+                    <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => toast.error("Google Login Failed")}
+                        theme="outline"
+                        shape="pill"
+                        width="100%"
+                    />
+                </div>
 
                 <div style={styles.footer}>
                     <button onClick={handleBackToLogin} style={styles.linkButton}>
@@ -254,5 +291,27 @@ const styles: Record<string, React.CSSProperties> = {
         fontWeight: 'bold',
         cursor: 'pointer',
         textDecoration: 'underline',
+    },
+    divider: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        margin: "20px 0",
+        gap: "10px",
+    },
+    dividerLine: {
+        flex: 1,
+        height: "1px",
+        backgroundColor: "#eee",
+    },
+    dividerText: {
+        color: "#999",
+        fontSize: "14px",
+        fontWeight: "bold",
+    },
+    googleWrapper: {
+        display: "flex",
+        justifyContent: "center",
+        marginTop: "10px",
     },
 };

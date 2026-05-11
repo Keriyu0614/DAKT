@@ -1,15 +1,15 @@
 import { useEffect, useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
-    Calendar,
-    Pill,
+    Plus,
+    MoreVertical,
     Activity,
-    Bell,
+    Pill,
+    AlertTriangle,
     AlertCircle
 } from "lucide-react";
 import "./DashboardPage.css";
-
-// API Imports
 import { appointmentApi } from "../../api/appointment.api";
 import { medicationService } from "../../services/medication.service";
 import { type Medication } from "../../api/medication.api";
@@ -18,12 +18,6 @@ import { healthApi, type HealthLog } from "../../api/health.api";
 import { notificationApi, type Notification } from "../../api/notification.api";
 import { useAuth } from "../../context/AuthContext";
 
-// Sub-components
-import DashboardSummaryCards from "../../components/dashboard/DashboardSummaryCards";
-import PriorityAlertSection, { type PriorityAlert } from "../../components/dashboard/PriorityAlertSection";
-import DashboardTimeline, { type TimelineItem } from "../../components/dashboard/DashboardTimeline";
-
-// Types
 interface DashboardData {
     appointments: any[];
     medications: Medication[];
@@ -33,6 +27,7 @@ interface DashboardData {
 }
 
 export const DashboardPage = () => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const navigate = useNavigate();
 
@@ -46,16 +41,18 @@ export const DashboardPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // --- 1. Data Fetching ---
+    // --- 1. Lấy dữ liệu từ API ---
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
+                setLoading(true);
+                // Gọi song song tất cả các API
                 const [apptRes, medRes, remRes, healthRes, notifRes] = await Promise.all([
-                    appointmentApi.getAll(),
-                    medicationService.getMedications(),
-                    reminderApi.getReminders(),
-                    healthApi.getHealthLogs(),
-                    user?.id ? notificationApi.getNotifications(user.id) : Promise.resolve({ data: [] })
+                    appointmentApi.getAll().catch(() => ({ data: [] })),
+                    medicationService.getMedications().catch(() => []),
+                    reminderApi.getReminders().catch(() => ({ data: [] })),
+                    healthApi.getHealthLogs().catch(() => ({ data: [] })),
+                    user?.id ? notificationApi.getNotifications(user.id).catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
                 ]);
 
                 setData({
@@ -65,9 +62,10 @@ export const DashboardPage = () => {
                     healthLogs: healthRes.data || [],
                     notifications: (notifRes as any).data || []
                 });
+                setError(null);
             } catch (err) {
                 console.error("Failed to load dashboard data", err);
-                setError("Unable to load dashboard information. Please try again later.");
+                setError(t('dashboard_error') || "Không thể tải dữ liệu dashboard. Vui lòng kiểm tra backend.");
             } finally {
                 setLoading(false);
             }
@@ -78,100 +76,48 @@ export const DashboardPage = () => {
         }
     }, [user?.id]);
 
-    // --- 2. Derived State & Logic ---
-    const today = useMemo(() => {
-        const d = new Date();
-        d.setHours(0, 0, 0, 0);
-        return d;
+    // --- 2. Logic xử lý dữ liệu để hiển thị lên giao diện thiết kế ---
+
+    // Tìm các nhắc nhở bị bỏ lỡ (Status = 2: Missed) để hiển thị Banner Cảnh báo
+    const missedReminders = useMemo(() =>
+        data.reminders.filter(r => r.status === 2).sort((a, b) =>
+            new Date(b.scheduledTime).getTime() - new Date(a.scheduledTime).getTime()
+        ), [data.reminders]);
+
+    // Thống kê tỷ lệ tuân thủ (giả lập dựa trên số nhắc nhở thành công / tổng số)
+    const complianceStats = useMemo(() => {
+        // Đây là logic mẫu, bạn có thể điều chỉnh tùy theo dữ liệu thực tế
+        return [60, 45, 70, 85, 40]; // Tương ứng T2, T3, T4, T5, T6
     }, []);
 
-    // A. Priority Alerts
-    const priorityAlerts = useMemo(() => {
-        const alerts: PriorityAlert[] = [];
+    // Hoạt động gần đây (Gộp nhắc nhở và lịch hẹn)
+    const recentActivities = useMemo(() => {
+        const activities = [
+            ...data.reminders.map(r => ({
+                id: r.id,
+                title: r.type === 0 ? t('medications') : t('reminders'),
+                desc: r.status === 1 ? t('completed') : r.status === 2 ? t('missed_badge') : t('pending'),
+                time: new Date(r.scheduledTime),
+                status: r.status
+            })),
+            ...data.appointments.map(a => ({
+                id: a.id,
+                title: `${t('appointments')} Dr. ${a.doctorName}`,
+                desc: a.status || t('pending'),
+                time: new Date(a.appointmentDate),
+                status: 3
+            }))
+        ];
+        return activities.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 3);
+    }, [data.reminders, data.appointments]);
 
-        // Missed Reminders
-        const missedReminders = data.reminders.filter(r => r.status === 2);
-        if (missedReminders.length > 0) {
-            alerts.push({
-                type: 'reminder',
-                title: 'Missed Medication Reminders',
-                message: `You have ${missedReminders.length} missed reminder${missedReminders.length > 1 ? 's' : ''}.`,
-                severity: 'high',
-                link: '/app/reminders'
-            });
-        }
+    // --- 3. Render giao diện ---
 
-        // Failed Notifications
-        const failedNotifs = data.notifications.filter(n => n.status === 4);
-        if (failedNotifs.length > 0) {
-            alerts.push({
-                type: 'notification',
-                title: 'Delivery Failed',
-                message: `${failedNotifs.length} notification${failedNotifs.length > 1 ? 's' : ''} failed to send.`,
-                severity: 'medium',
-                link: '/app/notifications'
-            });
-        }
-
-        return alerts;
-    }, [data.reminders, data.notifications]);
-
-    // B. Today's Timeline
-    const timelineItems = useMemo(() => {
-        const items: TimelineItem[] = [];
-
-        data.appointments.forEach(appt => {
-            const apptDate = new Date(appt.appointmentDate);
-            if (apptDate.toDateString() === today.toDateString()) {
-                items.push({
-                    id: appt.id,
-                    time: apptDate,
-                    title: `Dr. ${appt.doctorName} (${appt.appointmentType || 'Visit'})`,
-                    type: 'appointment',
-                    status: appt.status || 'Upcoming',
-                    link: '/app/appointments'
-                });
-            }
-        });
-
-        data.reminders.forEach(rem => {
-            const remDate = new Date(rem.scheduledTime);
-            if (remDate.toDateString() === today.toDateString()) {
-                const typeLabel = rem.type === 0 ? "Medication" : rem.type === 1 ? "Appointment" : "Health";
-                const statusLabel = rem.status === 0 ? "Pending" : rem.status === 1 ? "Taken" : "Missed";
-                items.push({
-                    id: rem.id,
-                    time: remDate,
-                    title: `${typeLabel} Reminder`,
-                    type: 'reminder',
-                    status: statusLabel,
-                    link: '/app/reminders'
-                });
-            }
-        });
-
-        return items.sort((a, b) => a.time.getTime() - b.time.getTime());
-    }, [data.appointments, data.reminders, today]);
-
-    // C. Snapshot Data
-    const activeMedCount = data.medications.filter(m => m.status === 'Active').length;
-    const unreadNotifCount = data.notifications.filter(n => (n.status as any) !== 2).length;
-
-    const nextAppointment = data.appointments
-        .map(a => ({ ...a, dateObj: new Date(a.appointmentDate) }))
-        .filter(a => a.dateObj >= new Date())
-        .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())[0];
-
-    const nextAppointmentDate = nextAppointment
-        ? nextAppointment.dateObj.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-        : '--';
-
-    // --- Render ---
     if (loading) {
         return (
             <div className="loading-container">
                 <div className="loading-spinner"></div>
-                <p>Gathering your daily overview...</p>
+                <p>{t('connecting_system')}</p>
             </div>
         );
     }
@@ -180,48 +126,128 @@ export const DashboardPage = () => {
         return (
             <div className="error-container">
                 <AlertCircle size={48} color="#e74c3c" />
-                <h3>Unable to load dashboard</h3>
+                <h3>{t('connection_error')}</h3>
                 <p>{error}</p>
-                <button onClick={() => window.location.reload()} className="action-btn">Retry</button>
+                <button onClick={() => window.location.reload()} className="action-btn">{t('retry')}</button>
             </div>
         );
     }
 
     return (
         <div className="dashboard-container">
+            {/* Header */}
             <header className="dashboard-header">
-                <h1 className="dashboard-greeting">Good morning, {user?.name || 'User'}</h1>
-                <p className="dashboard-subtitle">Here represents what needs your attention today.</p>
+                <h1 className="dashboard-greeting">{t('dashboard_greeting', { name: user?.name || 'User' })}</h1>
+                <div className="header-actions">
+                    <button className="btn-add-med" onClick={() => navigate('/app/medications')}>
+                        <Plus size={18} /> {t('add_med_dashboard')}
+                    </button>
+                </div>
             </header>
 
-            <PriorityAlertSection alerts={priorityAlerts} onNavigate={navigate} />
+            {/* Priority Alert Section - Chỉ hiện nếu có liều thuốc bị bỏ lỡ */}
+            {missedReminders.length > 0 ? (
+                <section className="priority-alert-box">
+                    <div className="alert-icon-red">
+                        <AlertTriangle size={24} />
+                    </div>
+                    <div className="alert-text">
+                        <h2>{t('missed_med_alert')}</h2>
+                        <p>
+                            {t('missed_med_desc', { count: missedReminders.length })}
+                        </p>
+                    </div>
+                    <button className="btn-check-alert" onClick={() => navigate('/app/reminders')}>
+                        {t('check_now')}
+                    </button>
+                </section>
+            ) : (
+                <section className="priority-alert-box" style={{ backgroundColor: '#e8f5e9', borderColor: '#c8e6c9' }}>
+                    <div className="alert-icon-red" style={{ backgroundColor: '#4caf50' }}>✓</div>
+                    <div className="alert-text">
+                        <h2 style={{ color: '#2e7d32' }}>{t('everything_ok')}</h2>
+                        <p style={{ color: '#4caf50' }}>{t('all_done_desc')}</p>
+                    </div>
+                </section>
+            )}
 
-            <div className="dashboard-main-layout">
-                <DashboardSummaryCards
-                    activeMedCount={activeMedCount}
-                    remindersTodayCount={timelineItems.filter(i => i.type === 'reminder').length}
-                    nextAppointmentDate={nextAppointmentDate}
-                    unreadNotifCount={unreadNotifCount}
-                    onNavigate={navigate}
-                />
+            {/* Relatives Section */}
+            <section className="relatives-section">
+                <h2 className="section-heading">{t('relatives_list')}</h2>
+                <div className="relatives-grid">
+                    {/* Ở đây bạn có thể map qua danh sách bệnh nhân/người thân nếu có API riêng, 
+                        hiện tại giữ nguyên 2 thẻ mẫu theo thiết kế */}
+                    <div className="relative-card">
+                        <div className="card-header">
+                            <div className="avatar-placeholder" style={{ backgroundColor: '#ccff99', color: '#4caf50' }}>P</div>
+                            <span className="relative-name">{t('grandma')}</span>
+                            <MoreVertical size={20} className="more-icon" />
+                        </div>
+                        <div className={`status-badge ${missedReminders.length > 0 ? 'missed' : 'completed'}`}>
+                            <span>{missedReminders.length > 0 ? `❌ ${t('missed_badge')}` : `✅ ${t('completed_badge')}`}</span>
+                        </div>
+                        <p className="next-schedule">{t('meds_using')} {data.medications.length}</p>
+                        <button className="btn-details" onClick={() => navigate('/app/medications')}>
+                            {t('view_details')}
+                        </button>
+                    </div>
 
-                <DashboardTimeline items={timelineItems} onNavigate={navigate} />
+                    <div className="relative-card">
+                        <div className="card-header">
+                            <div className="avatar-placeholder" style={{ backgroundColor: '#ffe5e5', color: '#ff4d4d' }}>F</div>
+                            <span className="relative-name">{t('grandpa')}</span>
+                            <MoreVertical size={20} className="more-icon" />
+                        </div>
+                        <div className="status-badge completed">
+                            <span>✅ {t('completed_badge')}</span>
+                        </div>
+                        <p className="next-schedule">{t('health_status')} {t('normal')}</p>
+                        <button className="btn-details" onClick={() => navigate('/app/health')}>
+                            {t('view_details')}
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            {/* Bottom Grid: Stats & Activity */}
+            <div className="bottom-grid">
+                {/* Biểu đồ tuân thủ */}
+                <div className="stat-box">
+                    <h3 className="stat-title"><Pill size={18} /> {t('compliance_rate')}</h3>
+                    <div className="chart-placeholder">
+                        {complianceStats.map((val, idx) => (
+                            <div
+                                key={idx}
+                                className={`bar ${idx === 3 ? 'active' : ''}`}
+                                style={{ height: `${val}%` }}
+                            ></div>
+                        ))}
+                    </div>
+                    <div className="chart-labels">
+                        <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span>
+                    </div>
+                </div>
+
+                {/* Hoạt động gần đây từ API */}
+                <div className="stat-box">
+                    <h3 className="stat-title"><Activity size={18} /> {t('recent_activity')}</h3>
+                    <ul className="activity-list">
+                        {recentActivities.length > 0 ? (
+                            recentActivities.map((act) => (
+                                <li className="activity-item" key={act.id}>
+                                    <span className={`dot-indicator ${act.status === 1 ? 'bg-success' : act.status === 2 ? 'bg-danger' : 'bg-primary'}`}></span>
+                                    <div className="activity-content">
+                                        <strong>{act.title}</strong> - {act.desc}
+                                        <span className="activity-time">{act.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                </li>
+                            ))
+                        ) : (
+                            <p>{t('no_recent_activity')}</p>
+                        )}
+                    </ul>
+                </div>
             </div>
-
-            <nav className="nav-shortcuts-bar">
-                <button className="shortcut-btn" onClick={() => navigate('/app/medications')}>
-                    <Pill size={20} /> Manage Medications
-                </button>
-                <button className="shortcut-btn" onClick={() => navigate('/app/reminders')}>
-                    <Bell size={20} /> View Reminders
-                </button>
-                <button className="shortcut-btn" onClick={() => navigate('/app/appointments')}>
-                    <Calendar size={20} /> Appointments
-                </button>
-                <button className="shortcut-btn" onClick={() => navigate('/app/health')}>
-                    <Activity size={20} /> Health Records
-                </button>
-            </nav>
         </div>
     );
-}
+};

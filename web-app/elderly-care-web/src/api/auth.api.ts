@@ -27,6 +27,15 @@ const authApi = {
     register: (data: RegisterRequest) => {
         return axiosClient.post<AuthResponse>("/api/auth/register", data);
     },
+    googleLogin: (idToken: string) => {
+        return axiosClient.post<AuthResponse>("/api/auth/google-login", { idToken });
+    },
+    createElderly: (data: { name: string; email: string; password: string; caregiverId: string }) => {
+        return axiosClient.post<AuthResponse>("/api/auth/create-elderly", data);
+    },
+    getManagedElderly: (caregiverId: string) => {
+        return axiosClient.get<any[]>(`/api/auth/managed-elderly/${caregiverId}`);
+    },
 };
 
 export default authApi;

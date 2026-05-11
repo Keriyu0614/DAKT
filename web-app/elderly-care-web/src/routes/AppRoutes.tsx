@@ -9,11 +9,13 @@ import { DashboardPage } from "../pages/dashboard/DashboardPage";
 import { AppointmentsPage } from "../pages/appointments/AppointmentsPage";
 import { MedicationsPage } from "../pages/medications/MedicationsPage";
 import { HealthPage } from "../pages/health/HealthPage";
+import { HealthSchedulePage } from "../pages/health/HealthSchedulePage";
 import { RemindersPage } from "../pages/reminders/RemindersPage";
 import { NotificationsPage } from "../pages/notifications/NotificationsPage";
 import { ReportPage } from "../pages/report/ReportPage";
 import { ProfilePage } from "../pages/profile/ProfilePage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
+import { ElderlyPage } from "../pages/userelderly/ElderlyPage";
 
 export default function AppRoutes() {
   return (
@@ -31,11 +33,13 @@ export default function AppRoutes() {
             <Route path="appointments" element={<AppointmentsPage />} />
             <Route path="medications" element={<MedicationsPage />} />
             <Route path="health" element={<HealthPage />} />
+            <Route path="health-schedule" element={<HealthSchedulePage />} />
             <Route path="reminders" element={<RemindersPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="reports" element={<ReportPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="elderly" element={<ElderlyPage />} />
           </Route>
         </Route>
       </Routes>

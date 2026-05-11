@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { appointmentApi } from '../../api/appointment.api';
 import {
     Calendar,
@@ -14,6 +15,7 @@ import AppointmentForm from '../../components/appointment/AppointmentForm';
 import './AppointmentsPage.css';
 
 export const AppointmentsPage = () => {
+    const { t } = useTranslation();
     // --- State ---
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -37,7 +39,7 @@ export const AppointmentsPage = () => {
             setAppointments(response.data);
             setError('');
         } catch (err) {
-            setError('Unable to load appointments. Please check your connection.');
+            setError(t('loading_appts_error') || 'Unable to load appointments. Please check your connection.');
             console.error(err);
         } finally {
             setLoading(false);
@@ -104,7 +106,7 @@ export const AppointmentsPage = () => {
 
     if (loading) return (
         <div className="appointments-container">
-            <div className="loading-view">Loading Appointments...</div>
+            <div className="loading-view">{t('loading_appts')}</div>
         </div>
     );
 
@@ -113,11 +115,11 @@ export const AppointmentsPage = () => {
             <header className="appointments-header">
                 <div className="header-content">
                     <div>
-                        <h1><Calendar size={32} /> Appointments</h1>
-                        <p>Your medical visits and scheduled care events</p>
+                        <h1><Calendar size={32} /> {t('appointments_title')}</h1>
+                        <p>{t('appointments_sub')}</p>
                     </div>
                     <button className="btn-primary btn-add" onClick={handleAddClick}>
-                        <Plus size={20} /> Add Appointment
+                        <Plus size={20} /> {t('add_appointment')}
                     </button>
                 </div>
             </header>
@@ -128,11 +130,11 @@ export const AppointmentsPage = () => {
                 {/* Upcoming Section */}
                 <section className="appointment-section">
                     <h2 className="section-title">
-                        <Calendar size={28} /> Upcoming Visits
+                        <Calendar size={28} /> {t('upcoming_visits')}
                     </h2>
                     <div className="appointment-list">
                         {groupedAppointments.upcoming.length === 0 ? (
-                            <p className="empty-text">No upcoming appointments scheduled.</p>
+                            <p className="empty-text">{t('no_upcoming_appts')}</p>
                         ) : (
                             groupedAppointments.upcoming.map(apt => (
                                 <AppointmentCard
@@ -155,13 +157,13 @@ export const AppointmentsPage = () => {
                         className="section-title collapsible"
                         onClick={() => setIsPastCollapsed(!isPastCollapsed)}
                     >
-                        <History size={28} /> Past Appointments ({groupedAppointments.past.length})
+                        <History size={28} /> {t('past_appointments')} ({groupedAppointments.past.length})
                         {isPastCollapsed ? <ChevronDown size={24} /> : <ChevronUp size={24} />}
                     </h2>
                     {!isPastCollapsed && (
                         <div className="appointment-list">
                             {groupedAppointments.past.length === 0 ? (
-                                <p className="empty-text">No past appointment records found.</p>
+                                <p className="empty-text">{t('no_past_appts')}</p>
                             ) : (
                                 groupedAppointments.past.map(apt => (
                                     <AppointmentCard

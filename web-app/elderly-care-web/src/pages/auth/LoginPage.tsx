@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import authApi from "../../api/auth.api";
 import { useAuth } from "../../context/AuthContext";
 import { toast } from "react-toastify";
+import { GoogleLogin, type CredentialResponse } from "@react-oauth/google";
 
 export const LoginPage = () => {
     const navigate = useNavigate();
@@ -52,6 +53,23 @@ export const LoginPage = () => {
         navigate("/register");
     };
 
+    const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+        if (!credentialResponse.credential) return;
+
+        try {
+            setLoading(true);
+            const response = await authApi.googleLogin(credentialResponse.credential);
+            login(response.data);
+            navigate("/app");
+            toast.success("Logged in with Google!");
+        } catch (err: any) {
+            console.error(err);
+            toast.error("Google login failed");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div style={styles.container}>
             <div style={styles.card}>
@@ -90,6 +108,23 @@ export const LoginPage = () => {
                         {loading ? "Logging in..." : "Login"}
                     </button>
                 </form>
+
+                <div style={styles.divider}>
+                    <span style={styles.dividerLine}></span>
+                    <span style={styles.dividerText}>OR</span>
+                    <span style={styles.dividerLine}></span>
+                </div>
+
+                <div style={styles.googleWrapper}>
+                    <GoogleLogin
+                        onSuccess={handleGoogleSuccess}
+                        onError={() => toast.error("Google Login Failed")}
+                        useOneTap
+                        theme="filled_blue"
+                        shape="pill"
+                        width="100%"
+                    />
+                </div>
 
                 <div style={styles.footer}>
                     <p style={styles.footerText}>Don't have an account?</p>
@@ -194,5 +229,27 @@ const styles: Record<string, React.CSSProperties> = {
         fontWeight: "bold",
         cursor: "pointer",
         textDecoration: "underline",
+    },
+    divider: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        margin: "20px 0",
+        gap: "10px",
+    },
+    dividerLine: {
+        flex: 1,
+        height: "1px",
+        backgroundColor: "#eee",
+    },
+    dividerText: {
+        color: "#999",
+        fontSize: "14px",
+        fontWeight: "bold",
+    },
+    googleWrapper: {
+        display: "flex",
+        justifyContent: "center",
+        marginTop: "10px",
     },
 };

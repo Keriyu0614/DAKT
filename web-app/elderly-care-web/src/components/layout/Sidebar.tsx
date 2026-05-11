@@ -2,8 +2,6 @@ import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
-  Calendar,
-  Pill,
   Activity,
   Bell,
   BellRing,
@@ -24,15 +22,20 @@ export default function Sidebar() {
           <span>{t('dashboard')}</span>
         </NavLink>
 
-        <NavLink to="/app/appointments" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Calendar size={20} />
-          <span>{t('appointments')}</span>
+        <NavLink to="/app/elderly" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <User size={20} />
+          <span>{t('elderly')}</span>
         </NavLink>
 
-        <NavLink to="/app/medications" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+        {/* <NavLink to="/app/appointments" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Calendar size={20} />
+          <span>{t('appointments')}</span>
+        </NavLink> */}
+
+        {/* <NavLink to="/app/medications" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <Pill size={20} />
           <span>{t('medications')}</span>
-        </NavLink>
+        </NavLink> */}
 
         <NavLink to="/app/health" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <Activity size={20} />
@@ -52,6 +55,11 @@ export default function Sidebar() {
         <NavLink to="/app/reports" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <FileText size={20} />
           <span>{t('reports')}</span>
+        </NavLink>
+
+        <NavLink to="/app/health-schedule" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <Activity size={20} />
+          <span>{t('health_schedule')}</span>
         </NavLink>
 
         <div className="sidebar-divider"></div>

@@ -10,6 +10,7 @@ namespace AuthService.Data
         }
 
         public DbSet<User> Users { get; set; }
+        public DbSet<UserConnection> UserConnections { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
