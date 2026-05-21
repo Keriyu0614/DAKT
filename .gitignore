@@ -24,3 +24,6 @@ dist-ssr/
 *.sln
 *.sw?
 .vs/
+*.zip
+**/build/
+node_modules/
