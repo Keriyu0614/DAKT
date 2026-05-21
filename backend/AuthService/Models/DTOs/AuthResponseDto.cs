@@ -31,6 +31,11 @@ public class AuthResponseDto
     public string Token { get; set; } = string.Empty;
 
     /// <summary>
+    /// URL to the user's avatar image
+    /// </summary>
+    public string? AvatarUrl { get; set; }
+
+    /// <summary>
     /// Creates a response DTO from a User entity
     /// </summary>
     public static AuthResponseDto FromUser(User user, string token)
@@ -41,7 +46,8 @@ public class AuthResponseDto
             Name = user.Name,
             Email = user.Email,
             Role = user.Role.ToString(),
-            Token = token
+            Token = token,
+            AvatarUrl = user.AvatarUrl
         };
     }
 }

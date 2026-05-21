@@ -136,6 +136,25 @@ public class NotificationsController : ControllerBase
             return StatusCode(500, new { message = "An error occurred while marking notification as read" });
         }
     }
+
+    /// <summary>
+    /// Mark all notifications for a user as read
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    [HttpPatch("user/{userId}/read-all")]
+    public async Task<ActionResult> MarkAllAsRead(Guid userId)
+    {
+        try
+        {
+            await _notificationService.MarkAllAsReadAsync(userId);
+            return Ok(new { message = "All notifications marked as read" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error marking all notifications as read for user {UserId}", userId);
+            return StatusCode(500, new { message = "An error occurred while marking all notifications as read" });
+        }
+    }
     
     /// <summary>
     /// STATE TRANSITION: Read → Acknowledged (TERMINAL STATE)

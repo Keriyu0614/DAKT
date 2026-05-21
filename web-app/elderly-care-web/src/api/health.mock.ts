@@ -32,7 +32,8 @@ let mockHealthLogs: HealthLog[] = [
         heartRate: 75,
         weight: 68.7,
         createdAt: getOffsetDate(-2),
-        updatedAt: getOffsetDate(-2)
+        updatedAt: getOffsetDate(-2),
+        recordedBy: 'self'
     },
     {
         id: 'log-3',
@@ -53,7 +54,8 @@ let mockHealthLogs: HealthLog[] = [
         heartRate: 80,
         note: 'Slightly high BP, will monitor',
         createdAt: getOffsetDate(-4),
-        updatedAt: getOffsetDate(-4)
+        updatedAt: getOffsetDate(-4),
+        recordedBy: 'self'
     },
     {
         id: 'log-5',

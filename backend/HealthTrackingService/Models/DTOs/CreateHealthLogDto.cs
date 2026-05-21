@@ -20,11 +20,10 @@ public class CreateHealthLogDto
     public DateTime Date { get; set; }
 
     /// <summary>
-    /// Blood pressure reading (e.g., "120/80")
+    /// Blood pressure reading (e.g., "120/80"). Optional — use "-" or omit if not measured.
     /// </summary>
-    [Required]
-    [StringLength(50, MinimumLength = 1)]
-    public string BloodPressure { get; set; } = string.Empty;
+    [StringLength(50)]
+    public string? BloodPressure { get; set; }
 
     /// <summary>
     /// Heart rate in beats per minute (optional)
@@ -43,4 +42,23 @@ public class CreateHealthLogDto
     /// </summary>
     [Range(20, 500)]
     public double? Weight { get; set; }
+
+    /// <summary>
+    /// Who recorded this log: "self" (elderly user) or "caregiver" (default)
+    /// </summary>
+    [StringLength(20)]
+    public string RecordedBy { get; set; } = "caregiver";
+
+    /// <summary>
+    /// Systolic blood pressure component (optional)
+    /// </summary>
+    [Range(60, 250)]
+    public int? Systolic { get; set; }
+
+    /// <summary>
+    /// Diastolic blood pressure component (optional)
+    /// </summary>
+    [Range(40, 150)]
+    public int? Diastolic { get; set; }
 }
+

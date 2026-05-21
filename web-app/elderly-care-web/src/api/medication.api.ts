@@ -56,8 +56,8 @@ export interface CreateMedicationDto {
 }
 
 export const medicationApi = {
-    getMedications: (): Promise<AxiosResponse<MedicationResponseDto[]>> =>
-        axiosClient.get("/api/medications"),
+    getMedications: (userId?: string): Promise<AxiosResponse<MedicationResponseDto[]>> =>
+        axiosClient.get("/api/medications", { params: { userId } }),
 
     createMedication: (payload: CreateMedicationDto): Promise<AxiosResponse<MedicationResponseDto>> =>
         axiosClient.post("/api/medications", payload),

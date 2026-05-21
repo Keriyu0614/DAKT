@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { io } from "socket.io-client";
+import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import {
     Plus,
@@ -17,6 +19,7 @@ import { reminderApi, type Reminder } from "../../api/reminder.api";
 import { healthApi, type HealthLog } from "../../api/health.api";
 import { notificationApi, type Notification } from "../../api/notification.api";
 import { useAuth } from "../../context/AuthContext";
+import authApi from "../../api/auth.api";
 
 interface DashboardData {
     appointments: any[];
@@ -24,6 +27,7 @@ interface DashboardData {
     reminders: Reminder[];
     healthLogs: HealthLog[];
     notifications: Notification[];
+    managedElderly: any[];
 }
 
 export const DashboardPage = () => {
@@ -36,10 +40,52 @@ export const DashboardPage = () => {
         medications: [],
         reminders: [],
         healthLogs: [],
-        notifications: []
+        notifications: [],
+        managedElderly: []
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const socket = io("http://localhost:5006");
+
+        socket.on("status_updated", (data: any) => {
+            console.log("Socket status_updated received in Dashboard:", data);
+            setData(prev => ({
+                ...prev,
+                reminders: prev.reminders.map(r => 
+                    r.id === data.reminderId ? { ...r, status: 1 } : r
+                )
+            }));
+        });
+
+        socket.on("medication_missed", (data: any) => {
+            console.log("Socket medication_missed received in Dashboard:", data);
+            setData(prev => ({
+                ...prev,
+                reminders: prev.reminders.map(r => 
+                    r.id === data.reminderId ? { ...r, status: 2 } : r
+                )
+            }));
+            
+            toast.error(
+                `⚠️ Cảnh báo: Người thân đã bỏ lỡ lịch uống thuốc lúc ${
+                    data.updatedReminder?.scheduledTime
+                        ? new Date(data.updatedReminder.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                        : ''
+                }!`,
+                {
+                    position: "top-right",
+                    autoClose: 10000,
+                }
+            );
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, []);
 
     // --- 1. Lấy dữ liệu từ API ---
     useEffect(() => {
@@ -47,12 +93,13 @@ export const DashboardPage = () => {
             try {
                 setLoading(true);
                 // Gọi song song tất cả các API
-                const [apptRes, medRes, remRes, healthRes, notifRes] = await Promise.all([
+                const [apptRes, medRes, remRes, healthRes, notifRes, elderlyRes] = await Promise.all([
                     appointmentApi.getAll().catch(() => ({ data: [] })),
                     medicationService.getMedications().catch(() => []),
                     reminderApi.getReminders().catch(() => ({ data: [] })),
                     healthApi.getHealthLogs().catch(() => ({ data: [] })),
-                    user?.id ? notificationApi.getNotifications(user.id).catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
+                    user?.id ? notificationApi.getNotifications(user.id).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+                    user?.id ? authApi.getManagedElderly(user.id).catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
                 ]);
 
                 setData({
@@ -60,7 +107,8 @@ export const DashboardPage = () => {
                     medications: (medRes as any) || [],
                     reminders: remRes.data || [],
                     healthLogs: healthRes.data || [],
-                    notifications: (notifRes as any).data || []
+                    notifications: (notifRes as any).data || [],
+                    managedElderly: (elderlyRes as any).data || []
                 });
                 setError(null);
             } catch (err) {
@@ -74,7 +122,7 @@ export const DashboardPage = () => {
         if (user?.id) {
             fetchDashboardData();
         }
-    }, [user?.id]);
+    }, [user?.id, t]);
 
     // --- 2. Logic xử lý dữ liệu để hiển thị lên giao diện thiết kế ---
 
@@ -109,7 +157,7 @@ export const DashboardPage = () => {
             }))
         ];
         return activities.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 3);
-    }, [data.reminders, data.appointments]);
+    }, [data.reminders, data.appointments, t]);
 
     // --- 3. Render giao diện ---
 
@@ -133,15 +181,33 @@ export const DashboardPage = () => {
         );
     }
 
+    const handleUnlinkElderly = async (elderlyId: string) => {
+        if (!user?.id) return;
+        if (window.confirm(t('confirm_delete_relative') || "Bạn có chắc muốn xóa người thân này?")) {
+            try {
+                await authApi.unlinkElderly(user.id, elderlyId);
+                // Refresh data
+                setData(prev => ({
+                    ...prev,
+                    managedElderly: prev.managedElderly.filter(e => e.id !== elderlyId)
+                }));
+                setMenuOpenId(null);
+            } catch (err) {
+                console.error("Failed to unlink elderly", err);
+                alert("Không thể xóa người thân.");
+            }
+        }
+    };
+
     return (
         <div className="dashboard-container">
             {/* Header */}
             <header className="dashboard-header">
                 <h1 className="dashboard-greeting">{t('dashboard_greeting', { name: user?.name || 'User' })}</h1>
                 <div className="header-actions">
-                    <button className="btn-add-med" onClick={() => navigate('/app/medications')}>
+                    {/* <button className="btn-add-med" onClick={() => navigate('/app/medications')}>
                         <Plus size={18} /> {t('add_med_dashboard')}
-                    </button>
+                    </button> */}
                 </div>
             </header>
 
@@ -175,37 +241,55 @@ export const DashboardPage = () => {
             <section className="relatives-section">
                 <h2 className="section-heading">{t('relatives_list')}</h2>
                 <div className="relatives-grid">
-                    {/* Ở đây bạn có thể map qua danh sách bệnh nhân/người thân nếu có API riêng, 
-                        hiện tại giữ nguyên 2 thẻ mẫu theo thiết kế */}
-                    <div className="relative-card">
-                        <div className="card-header">
-                            <div className="avatar-placeholder" style={{ backgroundColor: '#ccff99', color: '#4caf50' }}>P</div>
-                            <span className="relative-name">{t('grandma')}</span>
-                            <MoreVertical size={20} className="more-icon" />
+                    {data.managedElderly.length > 0 ? (
+                        data.managedElderly.map((person) => (
+                            <div className="relative-card" key={person.id}>
+                                <div className="card-header">
+                                    <div
+                                        className="avatar-placeholder"
+                                        style={{
+                                            backgroundColor: person.id.charCodeAt(0) % 2 === 0 ? '#ccff99' : '#ffe5e5',
+                                            color: person.id.charCodeAt(0) % 2 === 0 ? '#4caf50' : '#ff4d4d'
+                                        }}
+                                    >
+                                        {person.name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="relative-name">{person.name}</span>
+                                    <div className="menu-container">
+                                        <MoreVertical 
+                                            size={20} 
+                                            className="more-icon" 
+                                            onClick={() => setMenuOpenId(menuOpenId === person.id ? null : person.id)}
+                                        />
+                                        {menuOpenId === person.id && (
+                                            <div className="dropdown-menu">
+                                                <button onClick={() => navigate(`/app/health-schedule?id=${person.id}&name=${encodeURIComponent(person.name)}`)}>
+                                                    {t('view_calendar')}
+                                                </button>
+                                                <button className="delete-option" onClick={() => handleUnlinkElderly(person.id)}>
+                                                    {t('delete_relative')}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* <div className="status-badge completed">
+                                    <span>✅ {t('member')}</span>
+                                </div> */}
+                                <p className="next-schedule">{person.email}</p>
+                                <button
+                                    className="btn-details"
+                                    onClick={() => navigate(`/app/reports?id=${person.id}`)}
+                                >
+                                    {t('view_details')}
+                                </button>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="no-data-msg" style={{ gridColumn: '1/-1', textAlign: 'center', padding: '20px', color: '#888' }}>
+                            <p>{t('no_elderly_found')}</p>
                         </div>
-                        <div className={`status-badge ${missedReminders.length > 0 ? 'missed' : 'completed'}`}>
-                            <span>{missedReminders.length > 0 ? `❌ ${t('missed_badge')}` : `✅ ${t('completed_badge')}`}</span>
-                        </div>
-                        <p className="next-schedule">{t('meds_using')} {data.medications.length}</p>
-                        <button className="btn-details" onClick={() => navigate('/app/medications')}>
-                            {t('view_details')}
-                        </button>
-                    </div>
-
-                    <div className="relative-card">
-                        <div className="card-header">
-                            <div className="avatar-placeholder" style={{ backgroundColor: '#ffe5e5', color: '#ff4d4d' }}>F</div>
-                            <span className="relative-name">{t('grandpa')}</span>
-                            <MoreVertical size={20} className="more-icon" />
-                        </div>
-                        <div className="status-badge completed">
-                            <span>✅ {t('completed_badge')}</span>
-                        </div>
-                        <p className="next-schedule">{t('health_status')} {t('normal')}</p>
-                        <button className="btn-details" onClick={() => navigate('/app/health')}>
-                            {t('view_details')}
-                        </button>
-                    </div>
+                    )}
                 </div>
             </section>
 

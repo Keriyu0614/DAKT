@@ -12,6 +12,7 @@ export interface HealthLog {
     note?: string;
     createdAt: string;
     updatedAt: string;
+    recordedBy?: string;
 }
 
 export interface CreateHealthLogPayload {

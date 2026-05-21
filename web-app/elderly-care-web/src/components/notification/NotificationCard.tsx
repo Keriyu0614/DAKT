@@ -44,37 +44,37 @@ const NotificationCard = ({
             case NotificationStatus.Delivered:
                 return {
                     icon: <CheckCircle2 size={16} />,
-                    text: 'Delivered',
+                    text: 'Đã gửi',
                     className: 'status-delivered'
                 };
             case NotificationStatus.Read:
                 return {
                     icon: <Eye size={16} />,
-                    text: 'Read',
+                    text: 'Đã đọc',
                     className: 'status-read'
                 };
             case NotificationStatus.Acknowledged:
                 return {
                     icon: <CheckCheck size={16} />,
-                    text: 'Acknowledged',
+                    text: 'Đã xác nhận',
                     className: 'status-acknowledged'
                 };
             case NotificationStatus.Failed:
                 return {
                     icon: <AlertCircle size={16} />,
-                    text: 'Failed',
+                    text: 'Thất bại',
                     className: 'status-failed'
                 };
             case NotificationStatus.Retrying:
                 return {
                     icon: <ClockIcon size={16} />,
-                    text: 'Retrying',
+                    text: 'Đang thử lại',
                     className: 'status-retrying'
                 };
             default:
                 return {
                     icon: <Bell size={16} />,
-                    text: 'Unknown',
+                    text: 'Không rõ',
                     className: 'status-unknown'
                 };
         }
@@ -92,16 +92,16 @@ const NotificationCard = ({
 
     const getChannelText = (channel: DeliveryChannel) => {
         switch (channel) {
-            case DeliveryChannel.MobilePush: return 'Mobile Push';
+            case DeliveryChannel.MobilePush: return 'Thông báo đẩy';
             case DeliveryChannel.Email: return 'Email';
             case DeliveryChannel.SMS: return 'SMS';
-            case DeliveryChannel.InApp: return 'In-App';
-            default: return 'Unknown';
+            case DeliveryChannel.InApp: return 'Trong ứng dụng';
+            default: return 'Không rõ';
         }
     };
 
     const getRecipientText = (type: RecipientType) => {
-        return type === RecipientType.ElderlyUser ? 'Elderly User' : 'Caregiver';
+        return type === RecipientType.ElderlyUser ? 'Người cao tuổi' : 'Người chăm sóc';
     };
 
     const formatTime = (dateStr: string) => {
@@ -121,7 +121,7 @@ const NotificationCard = ({
     };
 
     const statusBadge = getStatusBadge(notif.status);
-    const sourceType = notif.title.includes('Appointment') ? 'Appointment' : notif.title.includes('Medication') ? 'Medication' : 'Health';
+    const sourceType = notif.title.includes('Appointment') ? 'Lịch khám' : notif.title.includes('Medication') ? 'Thuốc' : 'Sức khỏe';
 
     return (
         <div className={`notification-card ${statusBadge.className}`}>
@@ -139,7 +139,7 @@ const NotificationCard = ({
                         onClick={() => onViewDetails(notif)}
                         disabled={loadingDetail}
                     >
-                        {loadingDetail ? 'Loading...' : 'View details'}
+                        {loadingDetail ? 'Đang tải...' : 'Xem chi tiết'}
                     </button>
                 )}
             </div>
@@ -147,25 +147,25 @@ const NotificationCard = ({
             <div className="notification-metadata">
                 <div className="metadata-item">
                     <ClockIcon size={14} />
-                    <span>Sent at: {formatTime(notif.sentAt)}</span>
+                    <span>Gửi lúc: {formatTime(notif.sentAt)}</span>
                 </div>
                 <div className="metadata-item">
                     {getChannelIcon(notif.deliveryChannel)}
-                    <span>Channel: {getChannelText(notif.deliveryChannel)}</span>
+                    <span>Kênh: {getChannelText(notif.deliveryChannel)}</span>
                 </div>
                 <div className="metadata-item">
                     <Bell size={14} />
-                    <span>Recipient: {getRecipientText(notif.recipientType)}</span>
+                    <span>Người nhận: {getRecipientText(notif.recipientType)}</span>
                 </div>
                 <div className="metadata-item">
                     <span className="source-link" onClick={() => onViewDetails(notif)}>
-                        🔗 Source: Reminder → {sourceType}
+                        🔗 Nguồn: Nhắc nhở → {sourceType}
                     </span>
                 </div>
                 {notif.failureReason && (
                     <div className="metadata-item error-reason">
                         <AlertCircle size={14} />
-                        <span>Error: {notif.failureReason}</span>
+                        <span>Lỗi: {notif.failureReason}</span>
                     </div>
                 )}
             </div>
@@ -178,7 +178,7 @@ const NotificationCard = ({
                         disabled={isActioning}
                     >
                         <Eye size={20} />
-                        {isActioning ? 'Marking...' : 'Mark as Read'}
+                        {isActioning ? 'Đang đánh dấu...' : 'Đánh dấu đã đọc'}
                     </button>
                 )}
                 {notif.status === NotificationStatus.Read && (
@@ -188,7 +188,7 @@ const NotificationCard = ({
                         disabled={isActioning}
                     >
                         <CheckCheck size={20} />
-                        {isActioning ? 'Acknowledging...' : 'Acknowledge'}
+                        {isActioning ? 'Đang xác nhận...' : 'Xác nhận'}
                     </button>
                 )}
                 {notif.status === NotificationStatus.Failed && (
@@ -198,13 +198,13 @@ const NotificationCard = ({
                         disabled={isActioning}
                     >
                         <RefreshCw size={20} />
-                        {isActioning ? 'Retrying...' : 'Retry Delivery'}
+                        {isActioning ? 'Đang thử lại...' : 'Thử lại Gửi'}
                     </button>
                 )}
                 {notif.status === NotificationStatus.Retrying && (
                     <button className="btn-action" disabled>
                         <ClockIcon size={20} />
-                        Retrying...
+                        Đang thử lại...
                     </button>
                 )}
             </div>

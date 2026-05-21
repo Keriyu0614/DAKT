@@ -107,30 +107,43 @@ public class AuthController : ControllerBase
     {
         _logger.LogInformation("Login attempt for email: {Email}", dto.Email);
 
-        // Find user by email
-        var user = await _context.Users.FirstOrDefaultAsync(u => 
-            u.Email == dto.Email.ToLowerInvariant());
-
-        if (user == null)
+        try
         {
-            _logger.LogWarning("Login failed: User not found for email {Email}", dto.Email);
-            return Unauthorized(new { message = "Invalid email or password" });
-        }
+            if (string.IsNullOrWhiteSpace(dto.Email))
+            {
+                return BadRequest(new { message = "Email is required" });
+            }
 
-        // Verify password (plain text comparison for demo - use hashing in production!)
-        if (user.Password != dto.Password)
+            // Find user by email
+            var user = await _context.Users.FirstOrDefaultAsync(u => 
+                u.Email == dto.Email.ToLowerInvariant());
+
+            if (user == null)
+            {
+                _logger.LogWarning("Login failed: User not found for email {Email}", dto.Email);
+                return Unauthorized(new { message = "Invalid email or password" });
+            }
+
+            // Verify password (plain text comparison for demo - use hashing in production!)
+            if (user.Password != dto.Password)
+            {
+                _logger.LogWarning("Login failed: Invalid password for email {Email}", dto.Email);
+                return Unauthorized(new { message = "Invalid email or password" });
+            }
+
+            // Generate placeholder token (will be JWT in production)
+            var token = GeneratePlaceholderToken(user);
+
+            var response = AuthResponseDto.FromUser(user, token);
+            _logger.LogInformation("User logged in successfully: {UserId}", user.Id);
+
+            return Ok(response);
+        }
+        catch (Exception ex)
         {
-            _logger.LogWarning("Login failed: Invalid password for email {Email}", dto.Email);
-            return Unauthorized(new { message = "Invalid email or password" });
+            _logger.LogError(ex, "Login error for email: {Email}", dto.Email);
+            return StatusCode(500, new { message = "An error occurred during login", detail = ex.Message });
         }
-
-        // Generate placeholder token (will be JWT in production)
-        var token = GeneratePlaceholderToken(user);
-
-        var response = AuthResponseDto.FromUser(user, token);
-        _logger.LogInformation("User logged in successfully: {UserId}", user.Id);
-
-        return Ok(response);
     }
 
     /// <summary>
@@ -189,7 +202,7 @@ public class AuthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Google login error");
-            return StatusCode(500, new { message = "An error occurred during Google login" });
+            return StatusCode(500, new { message = "An error occurred during Google login", detail = ex.Message });
         }
     }
 
@@ -303,6 +316,186 @@ public class AuthController : ControllerBase
             .ToListAsync();
 
         return Ok(elderlyUsers);
+    }
+
+    /// <summary>
+    /// Upload a new avatar for a user
+    /// </summary>
+    [HttpPost("avatar/{userId}")]
+    public async Task<ActionResult> UploadAvatar(Guid userId, IFormFile file)
+    {
+        _logger.LogInformation("Avatar upload request for user: {UserId}", userId);
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+        {
+            return NotFound(new { message = "User not found" });
+        }
+
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "No file uploaded" });
+        }
+
+        try
+        {
+            var wwwrootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var avatarsPath = Path.Combine(wwwrootPath, "avatars");
+
+            if (!Directory.Exists(avatarsPath))
+            {
+                Directory.CreateDirectory(avatarsPath);
+            }
+
+            var fileName = $"{userId}_{DateTime.UtcNow.Ticks}{Path.GetExtension(file.FileName)}";
+            var filePath = Path.Combine(avatarsPath, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // In a real microservices environment, this URL would be more robust
+            // For this demo, we assume the gateway or direct access
+            user.AvatarUrl = $"/avatars/{fileName}";
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Avatar uploaded successfully for user: {UserId}, Path: {Path}", userId, user.AvatarUrl);
+
+            return Ok(new { avatarUrl = user.AvatarUrl });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error uploading avatar");
+            return StatusCode(500, new { message = "Error uploading avatar", detail = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Unlink an elderly user from a caregiver
+    /// </summary>
+    [HttpDelete("unlink-elderly/{caregiverId}/{elderlyId}")]
+    public async Task<ActionResult> UnlinkElderly(Guid caregiverId, Guid elderlyId)
+    {
+        _logger.LogInformation("Unlink elderly request: {ElderlyId} from {CaregiverId}", elderlyId, caregiverId);
+
+        var connection = await _context.UserConnections
+            .FirstOrDefaultAsync(c => c.CaregiverId == caregiverId && c.ElderlyId == elderlyId);
+
+        if (connection == null)
+        {
+            return NotFound(new { message = "Connection not found" });
+        }
+
+        _context.UserConnections.Remove(connection);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Elderly user unlinked successfully: {ElderlyId} from {CaregiverId}", elderlyId, caregiverId);
+        
+        return Ok(new { message = "Unlinked successfully" });
+    }
+
+    /// <summary>
+    /// Update user profile information
+    /// </summary>
+    [HttpPut("profile/{userId}")]
+    public async Task<ActionResult<AuthResponseDto>> UpdateProfile(Guid userId, [FromBody] UpdateProfileDto dto)
+    {
+        _logger.LogInformation("Update profile request for user: {UserId}", userId);
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+        {
+            return NotFound(new { message = "User not found" });
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Name))
+        {
+            user.Name = dto.Name;
+        }
+
+        if (dto.AvatarUrl != null)
+        {
+            user.AvatarUrl = dto.AvatarUrl;
+        }
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Profile updated successfully for user: {UserId}", userId);
+
+        var token = GeneratePlaceholderToken(user);
+        return Ok(AuthResponseDto.FromUser(user, token));
+    }
+
+    /// <summary>
+    /// Get user settings
+    /// </summary>
+    [HttpGet("settings/{userId}")]
+    public async Task<ActionResult<UserSettingsDto>> GetSettings(Guid userId)
+    {
+        _logger.LogInformation("Get settings request for user: {UserId}", userId);
+
+        var settings = await _context.UserSettings.FindAsync(userId);
+        if (settings == null)
+        {
+            // Create default settings if not exists
+            settings = new UserSettings { UserId = userId };
+            _context.UserSettings.Add(settings);
+            await _context.SaveChangesAsync();
+        }
+
+        return Ok(UserSettingsDto.FromEntity(settings));
+    }
+
+    /// <summary>
+    /// Update user settings
+    /// </summary>
+    [HttpPut("settings/{userId}")]
+    public async Task<ActionResult<UserSettingsDto>> UpdateSettings(Guid userId, [FromBody] UserSettingsDto dto)
+    {
+        _logger.LogInformation("Update settings request for user: {UserId}", userId);
+
+        var settings = await _context.UserSettings.FindAsync(userId);
+        if (settings == null)
+        {
+            settings = new UserSettings { UserId = userId };
+            _context.UserSettings.Add(settings);
+        }
+
+        settings.Language = dto.Language;
+        settings.Theme = dto.Theme;
+        settings.NotificationsEnabled = dto.NotificationsEnabled;
+        settings.AutoLogout = dto.AutoLogout;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Settings updated successfully for user: {UserId}", userId);
+        return Ok(UserSettingsDto.FromEntity(settings));
+    }
+
+    /// <summary>
+    /// INTERNAL: Get all elderly users
+    /// </summary>
+    [HttpGet("internal/elderly")]
+    public async Task<ActionResult<IEnumerable<User>>> GetAllElderlyInternal()
+    {
+        var elderlyUsers = await _context.Users
+            .Where(u => u.Role == UserRole.Elderly)
+            .ToListAsync();
+        return Ok(elderlyUsers);
+    }
+
+    /// <summary>
+    /// INTERNAL: Get all user connections
+    /// </summary>
+    [HttpGet("internal/connections")]
+    public async Task<ActionResult<IEnumerable<UserConnection>>> GetAllConnectionsInternal()
+    {
+        var connections = await _context.UserConnections.ToListAsync();
+        return Ok(connections);
     }
 
     /// <summary>

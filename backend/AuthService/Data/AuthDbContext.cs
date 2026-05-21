@@ -11,10 +11,16 @@ namespace AuthService.Data
 
         public DbSet<User> Users { get; set; }
         public DbSet<UserConnection> UserConnections { get; set; }
+        public DbSet<UserSettings> UserSettings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<UserSettings>(entity =>
+            {
+                entity.HasKey(e => e.UserId);
+            });
 
             modelBuilder.Entity<User>(entity =>
             {

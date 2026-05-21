@@ -69,10 +69,10 @@ export default function Sidebar() {
           <span>{t('profile')}</span>
         </NavLink>
 
-        <NavLink to="/app/settings" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+        {/* <NavLink to="/app/settings" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
           <Settings size={20} />
           <span>{t('settings')}</span>
-        </NavLink>
+        </NavLink> */}
       </nav>
     </aside>
   );

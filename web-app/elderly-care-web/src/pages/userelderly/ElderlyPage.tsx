@@ -51,8 +51,8 @@ export const ElderlyPage = () => {
         <div className="elderly-container">
             <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h1>{t('link_accounts')}</h1>
-                <button 
-                    className="btn-add-elderly" 
+                <button
+                    className="btn-add-elderly"
                     onClick={() => setIsModalOpen(true)}
                     style={{
                         backgroundColor: '#2563EB',
@@ -71,14 +71,14 @@ export const ElderlyPage = () => {
                 </button>
             </header>
 
-            <AddElderlyModal 
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
+            <AddElderlyModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
                 onSuccess={fetchManagedElderly}
             />
 
             {/* Khu vực tìm kiếm */}
-            <section className="search-section">
+            {/* <section className="search-section">
                 <div className="search-card">
                     <h3>{t('enter_relative_info')}</h3>
                     <div className="search-input-wrapper">
@@ -92,11 +92,11 @@ export const ElderlyPage = () => {
                     </div>
                     <p className="search-hint">{t('search_hint')}</p>
                 </div>
-            </section>
+            </section> */}
 
             {/* Danh sách gợi ý / Quản lý */}
             <section className="connections-section">
-                <h3>{t('connection_suggestions')}</h3>
+                {/* <h3>{t('connection_suggestions')}</h3> */}
                 <div className="elderly-grid">
                     {managedList.map((person) => (
                         <div className="elderly-card" key={person.id}>
@@ -107,11 +107,11 @@ export const ElderlyPage = () => {
                                 {person.avatarLetter || person.name.charAt(0).toUpperCase()}
                             </div>
                             <h4 className="person-name">{person.name}</h4>
-                            <p className="person-phone">📞 {person.phone}</p>
+                            <p className="person-phone">{person.phone}</p>
 
-                            <button className="btn-connect-invite">
+                            {/* <button className="btn-connect-invite">
                                 <UserPlus size={16} /> {t('send_invite')}
-                            </button>
+                            </button> */}
                         </div>
                     ))}
                 </div>

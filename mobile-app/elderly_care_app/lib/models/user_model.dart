@@ -4,6 +4,7 @@ class UserModel {
   final String email;
   final String role;
   final String token;
+  final String? avatarUrl;
 
   UserModel({
     required this.userId,
@@ -11,6 +12,7 @@ class UserModel {
     required this.email,
     required this.role,
     required this.token,
+    this.avatarUrl,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class UserModel {
       email: json['email'] ?? '',
       role: json['role'] ?? '',
       token: json['token'] ?? '',
+      avatarUrl: json['avatarUrl'],
     );
   }
 
@@ -30,6 +33,7 @@ class UserModel {
       'email': email,
       'role': role,
       'token': token,
+      'avatarUrl': avatarUrl,
     };
   }
 }

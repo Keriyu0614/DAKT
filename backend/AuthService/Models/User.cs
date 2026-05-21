@@ -51,4 +51,14 @@ public class User
     /// Timestamp when the user account was created
     /// </summary>
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// URL to the user's avatar image
+    /// </summary>
+    public string? AvatarUrl { get; set; }
+
+    /// <summary>
+    /// Timestamp when the user account was last updated
+    /// </summary>
+    public DateTime? UpdatedAt { get; set; }
 }

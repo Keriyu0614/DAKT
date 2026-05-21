@@ -5,6 +5,7 @@ interface User {
   name: string;
   email: string;
   role: string;
+  avatarUrl?: string;
 }
 
 interface LoginResponse {
@@ -13,6 +14,7 @@ interface LoginResponse {
   email: string;
   role: string;
   token: string;
+  avatarUrl?: string;
 }
 
 interface AuthContextType {
@@ -21,6 +23,7 @@ interface AuthContextType {
   isInitialized: boolean;
   login: (data: LoginResponse) => void;
   logout: () => void;
+  updateUser: (data: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,6 +55,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       name: data.name,
       email: data.email,
       role: data.role,
+      avatarUrl: data.avatarUrl,
     };
 
     setUser(userData);
@@ -61,6 +65,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     localStorage.setItem("user", JSON.stringify(userData));
   };
 
+  const updateUser = (data: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...data };
+      localStorage.setItem("user", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -68,7 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isInitialized, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isInitialized, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

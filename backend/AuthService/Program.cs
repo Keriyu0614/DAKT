@@ -83,7 +83,8 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseCors("AllowClients");
 app.UseAuthorization();
 app.MapControllers();

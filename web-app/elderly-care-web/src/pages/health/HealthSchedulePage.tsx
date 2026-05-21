@@ -1,12 +1,15 @@
-// src/pages/schedule/HealthSchedulePage.tsx
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, Plus, ChevronLeft, ChevronRight, CheckCircle2, Clock } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Upload, Plus, ChevronLeft, ChevronRight, CheckCircle2, Clock, User } from 'lucide-react';
 import { medicationService } from '../../services/medication.service';
 import { type Medication } from '../../api/medication.api';
 import { appointmentApi } from '../../api/appointment.api';
+import { reminderApi, type Reminder } from '../../api/reminder.api';
 import MedicationForm from '../../components/medication/MedicationForm';
 import AppointmentForm from '../../components/appointment/AppointmentForm';
+import { io } from 'socket.io-client';
+import { toast } from 'react-toastify';
 import './HealthSchedulePage.css';
 
 type Tab = 'medication' | 'appointment';
@@ -56,6 +59,10 @@ function formatTime(timeStr: string): string {
 
 export const HealthSchedulePage = () => {
   const { t, i18n } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const targetUserId = searchParams.get('id');
+  const targetUserName = searchParams.get('name');
+
   const [activeTab, setActiveTab] = useState<Tab>('medication');
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDayIndex, setSelectedDayIndex] = useState(() => {
@@ -65,6 +72,7 @@ export const HealthSchedulePage = () => {
 
   const [medications, setMedications] = useState<Medication[]>([]);
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -82,12 +90,14 @@ export const HealthSchedulePage = () => {
     setLoading(true);
     setError(null);
     try {
-      const [medsData, apptsRes] = await Promise.all([
-        medicationService.getMedications(),
-        appointmentApi.getAll()
+      const [medsData, apptsRes, remindersRes] = await Promise.all([
+        medicationService.getMedications(targetUserId || undefined),
+        appointmentApi.getAll(targetUserId || undefined),
+        reminderApi.getReminders(targetUserId || undefined).catch(() => ({ data: [] }))
       ]);
 
       setMedications(medsData);
+      setReminders(remindersRes.data || []);
 
       // Normalise appointments: handle both `appointmentDate` and mock `dateTime`
       const apptsArray = Array.isArray(apptsRes.data) ? apptsRes.data : [];
@@ -111,7 +121,70 @@ export const HealthSchedulePage = () => {
 
   useEffect(() => {
     fetchData();
+  }, [targetUserId]);
+
+  useEffect(() => {
+    const socket = io("http://localhost:5006");
+
+    socket.on("status_updated", (data: any) => {
+      console.log("Socket status_updated received in HealthSchedule:", data);
+      setReminders(prev => prev.map(r => 
+        r.id === data.reminderId ? { ...r, status: 1 } : r
+      ));
+    });
+
+    socket.on("medication_missed", (data: any) => {
+      console.log("Socket medication_missed received in HealthSchedule:", data);
+      setReminders(prev => prev.map(r => 
+        r.id === data.reminderId ? { ...r, status: 2 } : r
+      ));
+      
+      toast.error(
+        `⚠️ Cảnh báo: Người thân đã bỏ lỡ lịch uống thuốc lúc ${
+          data.updatedReminder?.scheduledTime
+            ? new Date(data.updatedReminder.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : ''
+        }!`,
+        {
+          position: "top-right",
+          autoClose: 10000,
+        }
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
+
+  const getMedReminderStatusInfo = (medId: string, time: string) => {
+    const [hour, minute] = time.split(':').map(Number);
+    const targetDate = new Date(selectedDate);
+    targetDate.setHours(hour, minute, 0, 0);
+
+    const r = reminders.find(rem => {
+      if (rem.type !== 0) return false;
+      if (rem.referenceId !== medId) return false;
+      const rTime = new Date(rem.scheduledTime);
+      return rTime.getFullYear() === targetDate.getFullYear() &&
+             rTime.getMonth() === targetDate.getMonth() &&
+             rTime.getDate() === targetDate.getDate() &&
+             rTime.getHours() === targetDate.getHours() &&
+             rTime.getMinutes() === targetDate.getMinutes();
+    });
+
+    if (!r) {
+      return { text: '🟡 Đang chờ', className: 'pending' };
+    }
+
+    if (r.status === 1) {
+      return { text: '🟢 Đã xong', className: 'done' };
+    } else if (r.status === 2) {
+      return { text: '🔴 Bỏ lỡ', className: 'missed' };
+    } else {
+      return { text: '🟡 Đang chờ', className: 'pending' };
+    }
+  };
 
   // ─── Filter by selected day ──────────────────────────────────────────────────
 
@@ -175,7 +248,15 @@ export const HealthSchedulePage = () => {
     <div className="schedule-page">
       {/* Header */}
       <div className="schedule-header">
-        <h1>{t('health_schedule')}</h1>
+        <div className="header-with-user">
+          <h1>{t('health_schedule')}</h1>
+          {targetUserName && (
+            <div className="user-badge">
+              <User size={16} />
+              <span>{targetUserName}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -266,21 +347,24 @@ export const HealthSchedulePage = () => {
               todayMeds.length === 0
                 ? <p className="empty-msg">{t('no_meds_day')}</p>
                 : todayMeds.flatMap(med =>
-                  getMedTimes(med).map((time, idx) => (
-                    <div className="schedule-item" key={`${med.id}-${idx}`}>
-                      <div className="item-time">{formatTime(time)}</div>
-                      <div className="item-info">
-                        <div className="item-name">{med.name}</div>
-                        <div className="item-sub">
-                          {med.dosage.amount} {med.dosage.unit}
-                          {med.instructions ? ` · ${med.instructions}` : ''}
+                  getMedTimes(med).map((time, idx) => {
+                    const statusInfo = getMedReminderStatusInfo(med.id, time);
+                    return (
+                      <div className="schedule-item" key={`${med.id}-${idx}`}>
+                        <div className="item-time">{formatTime(time)}</div>
+                        <div className="item-info">
+                          <div className="item-name">{med.name}</div>
+                          <div className="item-sub">
+                            {med.dosage.amount} {med.dosage.unit}
+                            {med.instructions ? ` · ${med.instructions}` : ''}
+                          </div>
+                        </div>
+                        <div className={`item-status ${statusInfo.className}`}>
+                          {statusInfo.text}
                         </div>
                       </div>
-                      <div className="item-status pending">
-                        <Clock size={13} /> {t('pending')}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )
             )}
 
@@ -350,6 +434,7 @@ export const HealthSchedulePage = () => {
         editingId={null}
         medications={medications}
         onSuccess={fetchData}
+        userId={targetUserId || undefined}
       />
 
       <AppointmentForm
@@ -357,6 +442,7 @@ export const HealthSchedulePage = () => {
         onClose={() => setShowApptForm(false)}
         editingAppointment={null}
         onSuccess={fetchData}
+        userId={targetUserId || undefined}
       />
     </div>
   );

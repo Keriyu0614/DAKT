@@ -75,11 +75,11 @@ const resources = {
             "retry": "Retry",
             "completed_badge": "Completed",
             "missed_badge": "Missed",
-            "link_accounts": "Find and Link Accounts",
+            "link_accounts": "Create Elderly Accounts",
             "enter_relative_info": "Enter relative information",
             "search_placeholder": "Search by Email, Name...",
             "search_hint": "Example: user@example.com",
-            "connection_suggestions": "Connection Suggestions",
+            //"connection_suggestions": "Connection Suggestions",
             "send_invite": "Send Invite",
             "managing_relatives": "Managing Relatives",
             "member": "Member",
@@ -87,7 +87,10 @@ const resources = {
             "status": "Status",
             "action": "Action",
             "connected": "Connected",
-            "view_profile": "View Profile"
+            "view_profile": "View Profile",
+            "no_elderly_found": "No managed relatives found. Please add them in the Elderly Care page.",
+            "view_calendar": "View Calendar",
+            "delete_relative": "Delete Relative"
         }
     },
     vn: {
@@ -163,11 +166,11 @@ const resources = {
             "retry": "Thử lại",
             "completed_badge": "Hoàn thành",
             "missed_badge": "Bỏ lỡ",
-            "link_accounts": "Tìm và liên kết tài khoản",
+            "link_accounts": "Tạo tài khoản người thân",
             "enter_relative_info": "Nhập thông tin người thân",
             "search_placeholder": "Tìm kiếm bằng Email, Tên,...",
             "search_hint": "Ví dụ: user@example.com",
-            "connection_suggestions": "Gợi ý kết nối",
+            //"connection_suggestions": "Gợi ý kết nối",
             "send_invite": "Gửi lời mời kết nối",
             "managing_relatives": "Người thân đang quản lý",
             "member": "Thành viên",
@@ -175,7 +178,10 @@ const resources = {
             "status": "Trạng thái",
             "action": "Hành động",
             "connected": "Đã liên kết",
-            "view_profile": "Xem hồ sơ"
+            "view_profile": "Xem hồ sơ",
+            "no_elderly_found": "Chưa có người thân nào được quản lý. Vui lòng thêm ở trang Người cao tuổi.",
+            "view_calendar": "Xem lịch",
+            "delete_relative": "Xóa người thân"
         }
     }
 };
@@ -184,7 +190,7 @@ i18n
     .use(initReactI18next)
     .init({
         resources,
-        lng: "en", // default language
+        lng: "vn", // ngôn ngữ mặc định: Tiếng Việt
         interpolation: {
             escapeValue: false
         }

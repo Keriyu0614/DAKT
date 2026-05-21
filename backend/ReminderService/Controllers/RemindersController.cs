@@ -41,6 +41,23 @@ public class RemindersController : ControllerBase
     }
 
     /// <summary>
+    /// Get reminders for a specific user
+    /// </summary>
+    /// <param name="userId">The user ID</param>
+    /// <returns>List of reminders for the user</returns>
+    [HttpGet("user/{userId}")]
+    [ProducesResponseType(typeof(IEnumerable<ReminderResponseDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<IEnumerable<ReminderResponseDto>>> GetByUserId(string userId)
+    {
+        _logger.LogInformation("Retrieving reminders for user: {UserId}", userId);
+        var reminders = await _context.Reminders
+            .Where(r => r.UserId == Guid.Parse(userId))
+            .ToListAsync();
+        var response = reminders.Select(ReminderResponseDto.FromEntity);
+        return Ok(response);
+    }
+
+    /// <summary>
     /// Get a specific reminder by ID
     /// </summary>
     /// <param name="id">The reminder ID</param>

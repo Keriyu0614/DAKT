@@ -34,12 +34,12 @@ export const RegisterPage = () => {
 
         // Validation
         if (!formData.fullName || !formData.email || !formData.password || !formData.confirmPassword) {
-            setError('Please fill in all fields.');
+            setError('Vui lòng điền đầy đủ các trường.');
             return;
         }
 
         if (formData.password !== formData.confirmPassword) {
-            setError('Passwords do not match.');
+            setError('Mật khẩu không khớp.');
             return;
         }
 
@@ -55,13 +55,13 @@ export const RegisterPage = () => {
             });
 
             // Navigate to Login after success
-            alert('Account created successfully! Please login.');
+            alert('Tạo tài khoản thành công! Vui lòng đăng nhập.');
             navigate('/login');
         } catch (err: any) {
             console.error(err);
             setError(
                 err?.response?.data?.message ||
-                'Registration failed. Please try again.'
+                'Đăng ký thất bại. Vui lòng thử lại.'
             );
         } finally {
             setLoading(false);
@@ -80,10 +80,10 @@ export const RegisterPage = () => {
             const response = await authApi.googleLogin(credentialResponse.credential);
             login(response.data);
             navigate("/app");
-            toast.success("Logged in with Google!");
+            toast.success("Đăng nhập bằng Google thành công!");
         } catch (err: any) {
             console.error(err);
-            toast.error("Google login failed");
+            toast.error("Đăng nhập bằng Google thất bại");
         } finally {
             setLoading(false);
         }
@@ -92,14 +92,14 @@ export const RegisterPage = () => {
     return (
         <div style={styles.container}>
             <div style={styles.card}>
-                <h1 style={styles.title}>Create Account</h1>
-                <p style={styles.subtitle}>Register a new account to start using the system</p>
+                <h1 style={styles.title}>Tạo Tài Khoản</h1>
+                <p style={styles.subtitle}>Đăng ký tài khoản mới để bắt đầu sử dụng hệ thống</p>
 
                 {error && <div style={styles.errorBox}>{error}</div>}
 
                 <form onSubmit={handleRegister} style={styles.form}>
                     <div style={styles.formGroup}>
-                        <label style={styles.label}>Register As</label>
+                        <label style={styles.label}>Đăng ký với vai trò</label>
                         <select
                             id="role"
                             style={styles.select}
@@ -107,25 +107,25 @@ export const RegisterPage = () => {
                             value={formData.role}
                             onChange={handleChange}
                         >
-                            <option value={0}>Elderly Person</option>
-                            <option value={1}>Caregiver</option>
+                            <option value={0}>Người cao tuổi</option>
+                            <option value={1}>Người chăm sóc</option>
                         </select>
                     </div>
 
                     <div style={styles.formGroup}>
-                        <label style={styles.label}>Full Name</label>
+                        <label style={styles.label}>Họ và Tên</label>
                         <input
                             id="fullName"
                             style={styles.input}
                             name="fullName"
                             value={formData.fullName}
                             onChange={handleChange}
-                            placeholder="e.g. John Doe"
+                            placeholder="Ví dụ: Nguyễn Văn A"
                         />
                     </div>
 
                     <div style={styles.formGroup}>
-                        <label style={styles.label}>Email Address</label>
+                        <label style={styles.label}>Địa chỉ Email</label>
                         <input
                             id="email"
                             style={styles.input}
@@ -133,12 +133,12 @@ export const RegisterPage = () => {
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
-                            placeholder="e.g. john@example.com"
+                            placeholder="Ví dụ: email@example.com"
                         />
                     </div>
 
                     <div style={styles.formGroup}>
-                        <label style={styles.label}>Password</label>
+                        <label style={styles.label}>Mật khẩu</label>
                         <input
                             id="password"
                             style={styles.input}
@@ -146,12 +146,12 @@ export const RegisterPage = () => {
                             name="password"
                             value={formData.password}
                             onChange={handleChange}
-                            placeholder="Create a password"
+                            placeholder="Tạo mật khẩu"
                         />
                     </div>
 
                     <div style={styles.formGroup}>
-                        <label style={styles.label}>Confirm Password</label>
+                        <label style={styles.label}>Xác nhận Mật khẩu</label>
                         <input
                             id="confirmPassword"
                             style={styles.input}
@@ -159,25 +159,25 @@ export const RegisterPage = () => {
                             name="confirmPassword"
                             value={formData.confirmPassword}
                             onChange={handleChange}
-                            placeholder="Confirm your password"
+                            placeholder="Xác nhận mật khẩu của bạn"
                         />
                     </div>
 
                     <button type="submit" style={styles.registerButton} disabled={loading}>
-                        {loading ? 'Creating Account...' : 'Register'}
+                        {loading ? 'Đang tạo tài khoản...' : 'Đăng ký'}
                     </button>
                 </form>
 
                 <div style={styles.divider}>
                     <span style={styles.dividerLine}></span>
-                    <span style={styles.dividerText}>OR</span>
+                    <span style={styles.dividerText}>HOẶC</span>
                     <span style={styles.dividerLine}></span>
                 </div>
 
                 <div style={styles.googleWrapper}>
                     <GoogleLogin
                         onSuccess={handleGoogleSuccess}
-                        onError={() => toast.error("Google Login Failed")}
+                        onError={() => toast.error("Đăng nhập Google thất bại")}
                         theme="outline"
                         shape="pill"
                         width="100%"
@@ -186,7 +186,7 @@ export const RegisterPage = () => {
 
                 <div style={styles.footer}>
                     <button onClick={handleBackToLogin} style={styles.linkButton}>
-                        Back to Login
+                        Quay lại Đăng nhập
                     </button>
                 </div>
             </div>
@@ -272,7 +272,7 @@ const styles: Record<string, React.CSSProperties> = {
         fontSize: '20px',
         fontWeight: 'bold',
         color: 'white',
-        backgroundColor: '#27ae60', // Green for register
+        backgroundColor: '#2980B9', // Green for register
         border: 'none',
         borderRadius: '8px',
         cursor: 'pointer',

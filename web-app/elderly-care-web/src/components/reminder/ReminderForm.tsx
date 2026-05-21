@@ -125,16 +125,16 @@ const ReminderForm = ({
     const validateField = (field: keyof FormData, value: string): string => {
         switch (field) {
             case 'reminderType':
-                return !value ? 'Please select what this reminder is for' : '';
+                return !value ? 'Vui lòng chọn loại nhắc nhở' : '';
             case 'sourceEventId':
-                return !value ? `Please select a ${formData.reminderType.toLowerCase()}` : '';
+                return !value ? `Vui lòng chọn một sự kiện` : '';
             case 'absoluteDate':
-                return formData.timingMode === 'absolute' && !value ? 'Please select a date' : '';
+                return formData.timingMode === 'absolute' && !value ? 'Vui lòng chọn ngày' : '';
             case 'absoluteTime':
-                return formData.timingMode === 'absolute' && !value ? 'Please select a time' : '';
+                return formData.timingMode === 'absolute' && !value ? 'Vui lòng chọn giờ' : '';
             case 'customInterval':
                 return formData.repeatMode === 'custom' && (!value || Number(value) <= 0)
-                    ? 'Interval must be at least 1' : '';
+                    ? 'Khoảng thời gian phải ít nhất là 1' : '';
             default:
                 return '';
         }
@@ -199,7 +199,7 @@ const ReminderForm = ({
 
         const triggerTime = calculateTriggerTime();
         if (triggerTime && triggerTime < now) {
-            errors.triggerTime = `Reminder time cannot be in the past. Selection: ${triggerTime.toLocaleString()}`;
+            errors.triggerTime = `Thời gian nhắc nhở không được trong quá khứ. Đã chọn: ${triggerTime.toLocaleString()}`;
         }
 
         const filteredErrors = Object.fromEntries(Object.entries(errors).filter(([_, v]) => v !== ''));
@@ -233,15 +233,15 @@ const ReminderForm = ({
 
             if (editingReminder) {
                 await reminderApi.updateReminder(editingReminder.id, payload);
-                toast.success('Reminder updated');
+                toast.success('Đã cập nhật nhắc nhở');
             } else {
                 await reminderApi.createReminder(payload);
-                toast.success('Reminder created');
+                toast.success('Đã tạo nhắc nhở');
             }
             onSuccess();
             onClose();
         } catch (err: any) {
-            toast.error(err?.response?.data?.message || 'Failed to save reminder');
+            toast.error(err?.response?.data?.message || 'Lỗi khi lưu nhắc nhở');
         } finally {
             setIsSubmitting(false);
         }
@@ -263,7 +263,7 @@ const ReminderForm = ({
             }));
         } else if (formData.reminderType === 'Health') {
             return healthLogs.map(log => ({
-                id: log.id, label: `Health Log - ${new Date(log.date).toLocaleDateString()}`
+                id: log.id, label: `Nhật ký sức khỏe - ${new Date(log.date).toLocaleDateString()}`
             }));
         }
         return [];
@@ -271,10 +271,10 @@ const ReminderForm = ({
 
     const getPreviewText = (): string => {
         const triggerTime = calculateTriggerTime();
-        if (!triggerTime) return 'Select source event and timing to see preview';
+        if (!triggerTime) return 'Chọn sự kiện và thời gian để xem trước';
         const sourceOptions = getSourceEventOptions();
         const sourceEvent = sourceOptions.find(opt => opt.id === formData.sourceEventId);
-        return `Trigger: ${triggerTime.toLocaleString()} • For: ${sourceEvent?.label || 'Unknown'}`;
+        return `Thời gian: ${triggerTime.toLocaleString()} • Cho: ${sourceEvent?.label || 'Chưa rõ'}`;
     };
 
     if (!isOpen) return null;
@@ -285,17 +285,17 @@ const ReminderForm = ({
                 <form onSubmit={handleSubmit}>
                     <div className="modal-header">
                         <div>
-                            <h2>{editingReminder ? 'Edit Reminder' : 'Add New Reminder'}</h2>
-                            <p className="form-subtitle">Set up a notification trigger</p>
+                            <h2>{editingReminder ? 'Cập nhật Nhắc Nhở' : 'Thêm Nhắc Nhở Mới'}</h2>
+                            <p className="form-subtitle">Cài đặt kích hoạt thông báo</p>
                         </div>
                         <button type="button" className="btn-close" onClick={handleCancelForm}><X size={24} /></button>
                     </div>
 
                     <div className="form-body">
                         <section className="form-section">
-                            <h3 className="form-section-title"><LinkIcon size={20} /> Reminder Source</h3>
+                            <h3 className="form-section-title"><LinkIcon size={20} /> Nguồn Nhắc Nhở</h3>
                             <div className="form-field">
-                                <label>What is this reminder for? (Required)</label>
+                                <label>Nhắc nhở này dành cho cái gì? (Bắt buộc)</label>
                                 <div className="radio-group">
                                     {(['Appointment', 'Medication', 'Health'] as const).map(type => (
                                         <label key={type} className="radio-label">
@@ -306,7 +306,7 @@ const ReminderForm = ({
                                                 disabled={!!editingReminder}
                                             />
                                             {type === 'Appointment' ? <Calendar size={20} /> : type === 'Medication' ? <Pill size={20} /> : <Activity size={20} />}
-                                            <span>{type}</span>
+                                            <span>{type === 'Appointment' ? 'Lịch khám' : type === 'Medication' ? 'Thuốc' : 'Sức khỏe'}</span>
                                         </label>
                                     ))}
                                 </div>
@@ -315,7 +315,7 @@ const ReminderForm = ({
 
                             {formData.reminderType && (
                                 <div className="form-field">
-                                    <label htmlFor="sourceEventId">Select {formData.reminderType} (Required)</label>
+                                    <label htmlFor="sourceEventId">Chọn {formData.reminderType === 'Appointment' ? 'Lịch khám' : formData.reminderType === 'Medication' ? 'Thuốc' : 'Sức khỏe'} (Bắt buộc)</label>
                                     <select
                                         id="sourceEventId"
                                         value={formData.sourceEventId}
@@ -324,7 +324,7 @@ const ReminderForm = ({
                                         className={formErrors.sourceEventId ? 'error' : ''}
                                         disabled={!!editingReminder}
                                     >
-                                        <option value="">Select...</option>
+                                        <option value="">Chọn...</option>
                                         {getSourceEventOptions().map(opt => (
                                             <option key={opt.id} value={opt.id}>{opt.label}</option>
                                         ))}
@@ -335,42 +335,42 @@ const ReminderForm = ({
                         </section>
 
                         <section className="form-section">
-                            <h3 className="form-section-title"><Timer size={20} /> Trigger Timing</h3>
+                            <h3 className="form-section-title"><Timer size={20} /> Thời Gian Kích Hoạt</h3>
                             <div className="form-field">
-                                <label>When should this reminder trigger? (Required)</label>
+                                <label>Khi nào nhắc nhở này kích hoạt? (Bắt buộc)</label>
                                 <div className="radio-group vertical">
                                     <label className="radio-label">
                                         <input type="radio" checked={formData.timingMode === 'relative'} onChange={() => handleFormChange('timingMode', 'relative')} />
-                                        <span>Relative to event time (Recommended)</span>
+                                        <span>Dựa trên thời gian sự kiện (Đề xuất)</span>
                                     </label>
                                     <label className="radio-label">
                                         <input type="radio" checked={formData.timingMode === 'absolute'} onChange={() => handleFormChange('timingMode', 'absolute')} />
-                                        <span>Specific date and time</span>
+                                        <span>Ngày và giờ cụ thể</span>
                                     </label>
                                 </div>
                             </div>
 
                             {formData.timingMode === 'relative' ? (
                                 <div className="form-field">
-                                    <label>Relative Trigger Time</label>
+                                    <label>Thời gian kích hoạt tương đối</label>
                                     <select value={formData.relativeTrigger} onChange={(e) => handleFormChange('relativeTrigger', e.target.value)}>
-                                        <option value="at_event">At event time</option>
-                                        <option value="15m_before">15 minutes before</option>
-                                        <option value="30m_before">30 minutes before</option>
-                                        <option value="1h_before">1 hour before</option>
-                                        <option value="2h_before">2 hours before</option>
-                                        <option value="1d_before">1 day before</option>
+                                        <option value="at_event">Vào lúc sự kiện</option>
+                                        <option value="15m_before">Trước 15 phút</option>
+                                        <option value="30m_before">Trước 30 phút</option>
+                                        <option value="1h_before">Trước 1 giờ</option>
+                                        <option value="2h_before">Trước 2 giờ</option>
+                                        <option value="1d_before">Trước 1 ngày</option>
                                     </select>
                                 </div>
                             ) : (
                                 <div className="form-row">
                                     <div className="form-field">
-                                        <label>Date</label>
+                                        <label>Ngày</label>
                                         <input type="date" value={formData.absoluteDate} onChange={(e) => handleFormChange('absoluteDate', e.target.value)} onBlur={() => handleBlur('absoluteDate')} />
                                         {formErrors.absoluteDate && <span className="error-text">{formErrors.absoluteDate}</span>}
                                     </div>
                                     <div className="form-field">
-                                        <label>Time</label>
+                                        <label>Giờ</label>
                                         <input type="time" value={formData.absoluteTime} onChange={(e) => handleFormChange('absoluteTime', e.target.value)} onBlur={() => handleBlur('absoluteTime')} />
                                         {formErrors.absoluteTime && <span className="error-text">{formErrors.absoluteTime}</span>}
                                     </div>
@@ -381,7 +381,7 @@ const ReminderForm = ({
                         <div className="delivery-preview">
                             <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 'bold', color: '#3498db' }}>
                                 <Info size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                                Reminder Preview
+                                Xem trước Nhắc Nhở
                             </h4>
                             <p style={{ margin: 0, fontSize: '14px', color: '#475569' }}>{getPreviewText()}</p>
                             {formErrors.triggerTime && <span className="error-text" style={{ marginTop: '10px' }}>{formErrors.triggerTime}</span>}
@@ -389,8 +389,8 @@ const ReminderForm = ({
                     </div>
 
                     <div className="form-actions">
-                        <button type="button" className="btn-secondary" onClick={handleCancelForm}>Cancel</button>
-                        <button type="submit" className="btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : editingReminder ? 'Update Reminder' : 'Create Reminder'}</button>
+                        <button type="button" className="btn-secondary" onClick={handleCancelForm}>Hủy</button>
+                        <button type="submit" className="btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Đang lưu...' : editingReminder ? 'Cập nhật Nhắc Nhở' : 'Tạo Nhắc Nhở'}</button>
                     </div>
                 </form>
             </div>
@@ -399,11 +399,11 @@ const ReminderForm = ({
                 <div className="modal-overlay">
                     <div className="modal-content confirm-modal">
                         <div className="modal-body">
-                            <h3>Discard Unsaved Changes?</h3>
-                            <p>You have unsaved changes. Are you sure you want to close the form?</p>
+                            <h3>Hủy các thay đổi chưa lưu?</h3>
+                            <p>Bạn có các thay đổi chưa được lưu. Bạn có chắc chắn muốn đóng biểu mẫu không?</p>
                             <div className="form-actions" style={{ padding: 0, marginTop: '20px' }}>
-                                <button className="btn-secondary" onClick={() => setShowExitConfirm(false)}>Stay</button>
-                                <button className="btn-primary" style={{ background: '#e74c3c' }} onClick={() => { setShowExitConfirm(false); onClose(); }}>Discard</button>
+                                <button className="btn-secondary" onClick={() => setShowExitConfirm(false)}>Ở lại</button>
+                                <button className="btn-primary" style={{ background: '#e74c3c' }} onClick={() => { setShowExitConfirm(false); onClose(); }}>Hủy bỏ</button>
                             </div>
                         </div>
                     </div>

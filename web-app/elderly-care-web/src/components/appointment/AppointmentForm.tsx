@@ -19,6 +19,7 @@ interface AppointmentFormProps {
     onClose: () => void;
     editingAppointment: Appointment | null;
     onSuccess: () => void;
+    userId?: string;
 }
 
 interface FormData {
@@ -43,7 +44,8 @@ const AppointmentForm = ({
     isOpen,
     onClose,
     editingAppointment,
-    onSuccess
+    onSuccess,
+    userId
 }: AppointmentFormProps) => {
     const [formData, setFormData] = useState<FormData>({
         appointmentType: '',
@@ -114,16 +116,16 @@ const AppointmentForm = ({
     const validateField = (field: keyof FormData, value: string | boolean): string => {
         switch (field) {
             case 'appointmentType':
-                return !value ? 'Please select an appointment type' : '';
+                return !value ? 'Vui lòng chọn loại lịch khám' : '';
             case 'doctorName':
-                return !value ? 'Please enter the doctor or facility name' :
-                    (value as string).length < 2 ? 'Name must be at least 2 characters' : '';
+                return !value ? 'Vui lòng nhập tên bác sĩ hoặc cơ sở y tế' :
+                    (value as string).length < 2 ? 'Tên phải có ít nhất 2 ký tự' : '';
             case 'appointmentDate':
-                return !value ? 'Please select an appointment date' : '';
+                return !value ? 'Vui lòng chọn ngày khám' : '';
             case 'appointmentTime':
-                return !value ? 'Please choose a valid appointment time' : '';
+                return !value ? 'Vui lòng chọn giờ khám hợp lệ' : '';
             case 'duration':
-                return value && Number(value) <= 0 ? 'Duration must be greater than 0' : '';
+                return value && Number(value) <= 0 ? 'Thời lượng phải lớn hơn 0' : '';
             default:
                 return '';
         }
@@ -161,6 +163,7 @@ const AppointmentForm = ({
         try {
             const dateTime = new Date(`${formData.appointmentDate}T${formData.appointmentTime}`);
             const payload: CreateAppointmentPayload = {
+                userId: userId || undefined,
                 doctorName: formData.doctorName,
                 location: formData.location,
                 appointmentDate: dateTime.toISOString(),
@@ -175,17 +178,17 @@ const AppointmentForm = ({
 
             if (editingAppointment) {
                 await appointmentApi.update(editingAppointment.id, payload);
-                toast.success('Appointment updated successfully');
+                toast.success('Đã cập nhật lịch khám thành công');
             } else {
                 await appointmentApi.create(payload);
-                toast.success('Appointment created successfully');
+                toast.success('Đã tạo lịch khám thành công');
             }
 
             onSuccess();
             onClose();
             resetForm();
         } catch (err) {
-            toast.error('Failed to save appointment. Please try again.');
+            toast.error('Lỗi khi lưu lịch khám. Vui lòng thử lại.');
             console.error(err);
         } finally {
             setIsSubmitting(false);
@@ -221,8 +224,8 @@ const AppointmentForm = ({
                 <form onSubmit={handleSubmit}>
                     <div className="modal-header">
                         <div>
-                            <h2>{editingAppointment ? 'Edit Appointment' : 'Add New Appointment'}</h2>
-                            <p className="form-subtitle">Schedule a medical visit</p>
+                            <h2>{editingAppointment ? 'Cập nhật Lịch khám' : 'Thêm Lịch khám mới'}</h2>
+                            <p className="form-subtitle">Lên lịch hẹn y tế</p>
                         </div>
                         <button type="button" className="btn-close" onClick={handleCancelForm}>
                             <X size={24} />
@@ -233,11 +236,11 @@ const AppointmentForm = ({
                         {/* Section 1: Appointment Identity */}
                         <section className="form-section">
                             <h3 className="form-section-title">
-                                <Stethoscope size={20} /> Appointment Information
+                                <Stethoscope size={20} /> Thông tin Lịch khám
                             </h3>
 
                             <div className="form-field">
-                                <label htmlFor="appointmentType">Appointment Type (Required)</label>
+                                <label htmlFor="appointmentType">Loại lịch khám (Bắt buộc)</label>
                                 <select
                                     id="appointmentType"
                                     value={formData.appointmentType}
@@ -245,22 +248,22 @@ const AppointmentForm = ({
                                     onBlur={() => handleBlur('appointmentType')}
                                     className={formErrors.appointmentType ? 'error' : ''}
                                 >
-                                    <option value="">Select type...</option>
-                                    <option value="Checkup">Checkup</option>
-                                    <option value="Test">Test</option>
-                                    <option value="Surgery">Surgery</option>
-                                    <option value="Consultation">Consultation</option>
-                                    <option value="Follow-up">Follow-up</option>
-                                    <option value="Emergency">Emergency</option>
+                                    <option value="">Chọn loại...</option>
+                                    <option value="Checkup">Kiểm tra sức khỏe</option>
+                                    <option value="Test">Xét nghiệm</option>
+                                    <option value="Surgery">Phẫu thuật</option>
+                                    <option value="Consultation">Tư vấn</option>
+                                    <option value="Follow-up">Tái khám</option>
+                                    <option value="Emergency">Cấp cứu</option>
                                 </select>
                                 {formErrors.appointmentType && (
                                     <span className="error-text">{formErrors.appointmentType}</span>
                                 )}
-                                <span className="helper-text">Examples: Checkup, Test, Surgery, Consultation</span>
+                                <span className="helper-text">Ví dụ: Kiểm tra sức khỏe, Xét nghiệm, Tái khám</span>
                             </div>
 
                             <div className="form-field">
-                                <label htmlFor="doctorName">Doctor / Facility Name (Required)</label>
+                                <label htmlFor="doctorName">Tên Bác sĩ / Cơ sở y tế (Bắt buộc)</label>
                                 <input
                                     type="text"
                                     id="doctorName"
@@ -276,7 +279,7 @@ const AppointmentForm = ({
                             </div>
 
                             <div className="form-field">
-                                <label htmlFor="specialty">Specialty (Optional)</label>
+                                <label htmlFor="specialty">Chuyên khoa (Không bắt buộc)</label>
                                 <input
                                     type="text"
                                     id="specialty"
@@ -284,19 +287,19 @@ const AppointmentForm = ({
                                     onChange={(e) => handleFormChange('specialty', e.target.value)}
                                     maxLength={50}
                                 />
-                                <span className="helper-text">E.g., Cardiology, Orthopedics</span>
+                                <span className="helper-text">Ví dụ: Tim mạch, Chấn thương chỉnh hình</span>
                             </div>
                         </section>
 
                         {/* Section 2: Date & Time */}
                         <section className="form-section">
                             <h3 className="form-section-title">
-                                <Calendar size={20} /> Date & Time
+                                <Calendar size={20} /> Ngày & Giờ
                             </h3>
 
                             <div className="form-row">
                                 <div className="form-field">
-                                    <label htmlFor="appointmentDate">Appointment Date (Required)</label>
+                                    <label htmlFor="appointmentDate">Ngày khám (Bắt buộc)</label>
                                     <input
                                         type="date"
                                         id="appointmentDate"
@@ -311,7 +314,7 @@ const AppointmentForm = ({
                                 </div>
 
                                 <div className="form-field">
-                                    <label htmlFor="appointmentTime">Appointment Time (Required)</label>
+                                    <label htmlFor="appointmentTime">Giờ khám (Bắt buộc)</label>
                                     <input
                                         type="time"
                                         id="appointmentTime"
@@ -329,12 +332,12 @@ const AppointmentForm = ({
                             {isPastDateTime() && (
                                 <div className="warning-box">
                                     <AlertCircle size={20} />
-                                    <span>This appointment is scheduled in the past. Please confirm this is correct.</span>
+                                    <span>Lịch khám này được lên lịch trong quá khứ. Vui lòng xác nhận điều này là chính xác.</span>
                                 </div>
                             )}
 
                             <div className="form-field">
-                                <label htmlFor="duration">Duration (Optional)</label>
+                                <label htmlFor="duration">Thời lượng (Không bắt buộc)</label>
                                 <div className="input-with-unit">
                                     <input
                                         type="number"
@@ -345,23 +348,23 @@ const AppointmentForm = ({
                                         className={formErrors.duration ? 'error' : ''}
                                         min="1"
                                     />
-                                    <span className="unit">minutes</span>
+                                    <span className="unit">phút</span>
                                 </div>
                                 {formErrors.duration && (
                                     <span className="error-text">{formErrors.duration}</span>
                                 )}
-                                <span className="helper-text">Estimated appointment length</span>
+                                <span className="helper-text">Thời gian khám dự kiến</span>
                             </div>
                         </section>
 
                         {/* Section 3: Location & Access */}
                         <section className="form-section">
                             <h3 className="form-section-title">
-                                <MapPin size={20} /> Location & Access
+                                <MapPin size={20} /> Địa điểm & Hình thức
                             </h3>
 
                             <div className="form-field">
-                                <label htmlFor="location">Location Address</label>
+                                <label htmlFor="location">Địa chỉ khám</label>
                                 <input
                                     type="text"
                                     id="location"
@@ -373,7 +376,7 @@ const AppointmentForm = ({
                             </div>
 
                             <div className="form-field">
-                                <label>Appointment Format</label>
+                                <label>Hình thức khám</label>
                                 <div className="radio-group">
                                     <label className="radio-label">
                                         <input
@@ -383,7 +386,7 @@ const AppointmentForm = ({
                                             onChange={() => handleFormChange('isTelehealth', false)}
                                         />
                                         <Home size={20} />
-                                        <span>In-Person</span>
+                                        <span>Khám trực tiếp</span>
                                     </label>
                                     <label className="radio-label">
                                         <input
@@ -393,13 +396,13 @@ const AppointmentForm = ({
                                             onChange={() => handleFormChange('isTelehealth', true)}
                                         />
                                         <Video size={20} />
-                                        <span>Telehealth</span>
+                                        <span>Khám từ xa</span>
                                     </label>
                                 </div>
                             </div>
 
                             <div className="form-field">
-                                <label htmlFor="transportationNotes">Transportation Notes (Optional)</label>
+                                <label htmlFor="transportationNotes">Ghi chú phương tiện di chuyển (Không bắt buộc)</label>
                                 <textarea
                                     id="transportationNotes"
                                     value={formData.transportationNotes}
@@ -407,18 +410,18 @@ const AppointmentForm = ({
                                     maxLength={300}
                                     rows={3}
                                 />
-                                <span className="helper-text">E.g., "Taxi booked", "Family member driving"</span>
+                                <span className="helper-text">Ví dụ: "Đã đặt taxi", "Người nhà chở đi"</span>
                             </div>
                         </section>
 
                         {/* Section 4: Preparation & Notes */}
                         <section className="form-section">
                             <h3 className="form-section-title">
-                                <FileText size={20} /> Preparation & Notes
+                                <FileText size={20} /> Chuẩn bị & Ghi chú
                             </h3>
 
                             <div className="form-field">
-                                <label htmlFor="preparationInstructions">Preparation Instructions</label>
+                                <label htmlFor="preparationInstructions">Hướng dẫn chuẩn bị</label>
                                 <textarea
                                     id="preparationInstructions"
                                     value={formData.preparationInstructions}
@@ -426,11 +429,11 @@ const AppointmentForm = ({
                                     maxLength={500}
                                     rows={4}
                                 />
-                                <span className="helper-text">E.g., "Fasting required", "Bring previous reports"</span>
+                                <span className="helper-text">Ví dụ: "Cần nhịn ăn", "Mang theo hồ sơ cũ"</span>
                             </div>
 
                             <div className="form-field">
-                                <label htmlFor="notes">Additional Notes</label>
+                                <label htmlFor="notes">Ghi chú bổ sung</label>
                                 <textarea
                                     id="notes"
                                     value={formData.notes}
@@ -438,7 +441,7 @@ const AppointmentForm = ({
                                     maxLength={1000}
                                     rows={5}
                                 />
-                                <span className="helper-text">Any other important information</span>
+                                <span className="helper-text">Thông tin quan trọng khác</span>
                             </div>
                         </section>
 
@@ -446,11 +449,11 @@ const AppointmentForm = ({
                         {editingAppointment && (
                             <section className="form-section identity-block">
                                 <h3 className="form-section-title">
-                                    🔒 Appointment Record
+                                    🔒 Hồ sơ lịch khám
                                 </h3>
                                 <div className="identity-info">
-                                    <p><strong>Appointment ID:</strong> {editingAppointment.id}</p>
-                                    <p><strong>Created:</strong> {new Date(editingAppointment.appointmentDate).toLocaleString()}</p>
+                                    <p><strong>ID Lịch khám:</strong> {editingAppointment.id}</p>
+                                    <p><strong>Ngày tạo:</strong> {new Date(editingAppointment.appointmentDate).toLocaleString()}</p>
                                 </div>
                             </section>
                         )}
@@ -462,7 +465,7 @@ const AppointmentForm = ({
                             className="btn-primary"
                             disabled={isSubmitting}
                         >
-                            {isSubmitting ? 'Saving...' : (editingAppointment ? 'Update Appointment' : 'Save Appointment')}
+                            {isSubmitting ? 'Đang lưu...' : (editingAppointment ? 'Cập nhật Lịch khám' : 'Lưu Lịch khám')}
                         </button>
                         <button
                             type="button"
@@ -470,7 +473,7 @@ const AppointmentForm = ({
                             onClick={handleCancelForm}
                             disabled={isSubmitting}
                         >
-                            Cancel
+                            Hủy
                         </button>
                     </div>
                 </form>
@@ -479,17 +482,17 @@ const AppointmentForm = ({
                     <div className="modal-overlay">
                         <div className="modal-content confirm-modal" onClick={e => e.stopPropagation()}>
                             <div className="modal-header">
-                                <h2>⚠️ Unsaved Changes</h2>
+                                <h2>⚠️ Thay Đổi Chưa Lưu</h2>
                             </div>
                             <div className="modal-body">
-                                <p>You have unsaved appointment changes. Are you sure you want to leave?</p>
+                                <p>Bạn có thay đổi lịch khám chưa được lưu. Bạn có chắc chắn muốn rời đi?</p>
                             </div>
                             <div className="form-actions">
                                 <button className="btn-primary" onClick={() => setShowExitConfirm(false)}>
-                                    Stay on Page
+                                    Ở lại Trang
                                 </button>
                                 <button className="btn-secondary" onClick={handleConfirmExit}>
-                                    Leave Without Saving
+                                    Rời đi Không Lưu
                                 </button>
                             </div>
                         </div>

@@ -253,6 +253,11 @@
   color: #ca8a04;
 }
 
+.item-status.missed {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
 .empty-msg {
   text-align: center;
   color: #94a3b8;

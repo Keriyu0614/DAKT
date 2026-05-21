@@ -40,7 +40,7 @@ export const MedicationsPage = () => {
             setError('');
         } catch (err) {
             console.error(err);
-            setError(t('loading_meds_error') || 'Failed to load medications.');
+            setError(t('loading_meds_error') || 'Không thể tải danh sách thuốc.');
         } finally {
             setLoading(false);
         }
@@ -67,29 +67,29 @@ export const MedicationsPage = () => {
         const action = newStatus === 'Paused' ? 'pause' : 'resume';
 
         if (newStatus === 'Paused') {
-            const confirmed = window.confirm(`Are you sure you want to pause ${med.name}? Reminders will stop triggering.`);
+            const confirmed = window.confirm(`Bạn có chắc chắn muốn tạm dừng ${med.name}? Các nhắc nhở sẽ ngừng kích hoạt.`);
             if (!confirmed) return;
         }
 
         try {
             await medicationService.toggleStatus(med);
-            toast.success(`Medication ${action}d`);
+            toast.success(`Thuốc đã được ${newStatus === 'Paused' ? 'tạm dừng' : 'tiếp tục'}`);
             fetchMedications();
         } catch (err) {
-            toast.error(`Failed to ${action} medication`);
+            toast.error(`Lỗi khi ${newStatus === 'Paused' ? 'tạm dừng' : 'tiếp tục'} thuốc`);
         }
     };
 
     const handleDelete = async (id: string) => {
-        const confirmed = window.confirm('Are you sure you want to delete this medication? This action cannot be undone.');
+        const confirmed = window.confirm('Bạn có chắc chắn muốn xóa loại thuốc này không? Hành động này không thể hoàn tác.');
         if (!confirmed) return;
 
         try {
             await medicationService.deleteMedication(id);
-            toast.success('Medication deleted');
+            toast.success('Đã xóa thuốc');
             fetchMedications();
         } catch (err) {
-            toast.error('Failed to delete medication');
+            toast.error('Lỗi khi xóa thuốc');
         }
     };
 

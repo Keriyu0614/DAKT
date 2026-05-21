@@ -15,6 +15,7 @@ import {
     Plus
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { io } from 'socket.io-client';
 import './RemindersPage.css';
 
 export const RemindersPage = () => {
@@ -26,6 +27,28 @@ export const RemindersPage = () => {
     const [enrichedReminders, setEnrichedReminders] = useState<EnrichedReminder[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        const socket = io("http://localhost:5006");
+
+        socket.on("status_updated", (data: any) => {
+            console.log("Socket status_updated received in Reminders:", data);
+            setReminders(prev => prev.map(r => 
+                r.id === data.reminderId ? { ...r, status: 1 } : r
+            ));
+        });
+
+        socket.on("medication_missed", (data: any) => {
+            console.log("Socket medication_missed received in Reminders:", data);
+            setReminders(prev => prev.map(r => 
+                r.id === data.reminderId ? { ...r, status: 2 } : r
+            ));
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, []);
 
     // Source Events
     const [appointments, setAppointments] = useState<any[]>([]);
@@ -59,8 +82,7 @@ export const RemindersPage = () => {
             setReminders(sorted);
             setError('');
         } catch (err) {
-            console.error(err);
-            setError('Unable to load reminders. Please check your connection.');
+            setError('Không thể tải danh sách nhắc nhở. Vui lòng kiểm tra kết nối.');
         } finally {
             setLoading(false);
         }
@@ -87,17 +109,17 @@ export const RemindersPage = () => {
             let sourceEventType = '';
 
             if (rem.type === 1) {
-                sourceEventType = 'Appointment';
+                sourceEventType = 'Lịch khám';
                 const apt = appointments.find(a => a.id === rem.referenceId);
                 if (apt) sourceEventName = apt.doctorName;
             } else if (rem.type === 0) {
-                sourceEventType = 'Medication';
+                sourceEventType = 'Thuốc';
                 const med = medications.find(m => m.id === rem.referenceId);
                 if (med) sourceEventName = med.name;
             } else if (rem.type === 2) {
-                sourceEventType = 'Health';
+                sourceEventType = 'Sức khỏe';
                 const log = healthLogs.find(h => h.id === rem.referenceId);
-                if (log) sourceEventName = `Health Log - ${new Date(log.date).toLocaleDateString()}`;
+                if (log) sourceEventName = `Nhật ký sức khỏe - ${new Date(log.date).toLocaleDateString()}`;
             }
 
             return {
@@ -137,33 +159,33 @@ export const RemindersPage = () => {
     const handleMarkDone = async (rem: Reminder) => {
         try {
             await reminderApi.markAsCompleted(rem.id);
-            toast.success('Reminder marked as done');
+            toast.success('Đã đánh dấu nhắc nhở hoàn thành');
             fetchReminders();
         } catch (err) {
-            toast.error('Failed to mark reminder as done');
+            toast.error('Lỗi khi đánh dấu nhắc nhở hoàn thành');
         }
     };
 
     const handleSnooze = async (rem: Reminder, minutes: number) => {
         try {
             await reminderApi.snooze(rem.id, minutes);
-            toast.info(`Snoozed for ${minutes} minutes`);
+            toast.info(`Đã báo lại trong ${minutes} phút`);
             setSnoozeDropdown(null);
             fetchReminders();
         } catch (err) {
-            toast.error('Failed to snooze reminder');
+            toast.error('Lỗi khi báo lại nhắc nhở');
         }
     };
 
     const handleDelete = async (rem: Reminder) => {
-        if (!window.confirm(`Are you sure you want to delete this reminder?`)) return;
+        if (!window.confirm(`Bạn có chắc chắn muốn xóa nhắc nhở này?`)) return;
 
         try {
             await reminderApi.deleteReminder(rem.id);
-            toast.info('Reminder deleted');
+            toast.info('Đã xóa nhắc nhở');
             fetchReminders();
         } catch (err) {
-            toast.error('Failed to delete reminder');
+            toast.error('Lỗi khi xóa nhắc nhở');
         }
     };
 
@@ -175,11 +197,11 @@ export const RemindersPage = () => {
         const diffHours = Math.floor(diffMins / 60);
         const diffDays = Math.floor(diffHours / 24);
 
-        if (diffMins < 0) return 'Overdue';
-        if (diffMins < 60) return `In ${diffMins} minute${diffMins !== 1 ? 's' : ''}`;
-        if (diffHours < 24) return `In ${diffHours} hour${diffHours !== 1 ? 's' : ''}`;
-        if (diffDays === 1) return 'Tomorrow';
-        return `In ${diffDays} days`;
+        if (diffMins < 0) return 'Quá hạn';
+        if (diffMins < 60) return `Trong ${diffMins} phút`;
+        if (diffHours < 24) return `Trong ${diffHours} giờ`;
+        if (diffDays === 1) return 'Ngày mai';
+        return `Trong ${diffDays} ngày`;
     };
 
     const formatAbsoluteTime = (dateStr: string): string => {
@@ -192,18 +214,18 @@ export const RemindersPage = () => {
         });
     };
 
-    if (loading) return <div className="loading-view">Loading Reminders...</div>;
+    if (loading) return <div className="loading-view">Đang tải nhắc nhở...</div>;
 
     return (
         <div className="reminders-container">
             <header className="reminders-header">
                 <div className="header-content">
                     <div>
-                        <h1><Bell size={32} /> Reminders</h1>
-                        <p>Scheduled notifications for your care events</p>
+                        <h1><Bell size={32} /> Nhắc Nhở</h1>
+                        <p>Thông báo được lên lịch cho các sự kiện chăm sóc của bạn</p>
                     </div>
                     <button className="btn-primary btn-add" onClick={() => { setEditingReminder(null); setShowForm(true); }}>
-                        <Plus size={20} /> Add Reminder
+                        <Plus size={20} /> Thêm Nhắc Nhở
                     </button>
                 </div>
             </header>
@@ -214,7 +236,7 @@ export const RemindersPage = () => {
                 {groupedReminders.today.length > 0 && (
                     <section className="reminder-section">
                         <h2 className="section-title">
-                            <Calendar size={28} /> Today
+                            <Calendar size={28} /> Hôm nay
                         </h2>
                         <div className="reminder-list">
                             {groupedReminders.today.map(rem => (
@@ -239,7 +261,7 @@ export const RemindersPage = () => {
                 {groupedReminders.upcoming.length > 0 && (
                     <section className="reminder-section">
                         <h2 className="section-title">
-                            <Calendar size={28} /> Upcoming
+                            <Calendar size={28} /> Sắp tới
                         </h2>
                         <div className="reminder-list">
                             {groupedReminders.upcoming.map(rem => (
@@ -267,7 +289,7 @@ export const RemindersPage = () => {
                             className="section-title collapsible"
                             onClick={() => setIsPastCollapsed(!isPastCollapsed)}
                         >
-                            <CheckCircle2 size={28} /> Completed / Past ({groupedReminders.past.length})
+                            <CheckCircle2 size={28} /> Đã hoàn thành / Đã qua ({groupedReminders.past.length})
                             {isPastCollapsed ? <ChevronDown size={24} /> : <ChevronUp size={24} />}
                         </h2>
                         {!isPastCollapsed && (
@@ -295,10 +317,10 @@ export const RemindersPage = () => {
                 {enrichedReminders.length === 0 && (
                     <div className="empty-state">
                         <Bell size={64} />
-                        <h3>No reminders scheduled</h3>
-                        <p>Create a reminder to get notified about appointments, medications, or health activities</p>
+                        <h3>Chưa có nhắc nhở nào</h3>
+                        <p>Tạo một nhắc nhở để nhận thông báo về lịch khám, đơn thuốc hoặc sức khỏe</p>
                         <button className="btn-primary" onClick={() => { setEditingReminder(null); setShowForm(true); }}>
-                            <Plus size={20} /> Add Your First Reminder
+                            <Plus size={20} /> Thêm Nhắc Nhở Đầu Tiên
                         </button>
                     </div>
                 )}

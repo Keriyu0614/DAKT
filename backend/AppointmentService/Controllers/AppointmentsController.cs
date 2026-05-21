@@ -17,11 +17,13 @@ public class AppointmentsController : ControllerBase
 {
     private readonly AppointmentDbContext _context;
     private readonly ILogger<AppointmentsController> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public AppointmentsController(AppointmentDbContext context, ILogger<AppointmentsController> logger)
+    public AppointmentsController(AppointmentDbContext context, ILogger<AppointmentsController> logger, IHttpClientFactory httpClientFactory)
     {
         _context = context;
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
     }
 
     /// <summary>
@@ -31,10 +33,18 @@ public class AppointmentsController : ControllerBase
     /// <response code="200">Returns the list of appointments</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<AppointmentResponseDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<AppointmentResponseDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<AppointmentResponseDto>>> GetAll([FromQuery] Guid? userId)
     {
-        _logger.LogInformation("Retrieving all appointments");
-        var appointments = await _context.Appointments.ToListAsync();
+        _logger.LogInformation("Retrieving appointments. UserId filter: {UserId}", userId);
+        
+        IQueryable<Appointment> query = _context.Appointments;
+        
+        if (userId.HasValue)
+        {
+            query = query.Where(a => a.UserId == userId.Value);
+        }
+
+        var appointments = await query.ToListAsync();
         var response = appointments.Select(AppointmentResponseDto.FromEntity);
         return Ok(response);
     }
@@ -93,8 +103,38 @@ public class AppointmentsController : ControllerBase
         _context.Appointments.Add(appointment);
         await _context.SaveChangesAsync();
 
+        // Create initial reminder
+        await CreateAppointmentReminder(appointment);
+
         var response = AppointmentResponseDto.FromEntity(appointment);
         return CreatedAtAction(nameof(GetById), new { id = appointment.Id }, response);
+    }
+
+    private async Task CreateAppointmentReminder(Appointment appointment)
+    {
+        try 
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            
+            var reminderDto = new
+            {
+                userId = appointment.UserId,
+                type = 1, // 1 = Appointment
+                referenceId = appointment.Id,
+                scheduledTime = appointment.AppointmentDate
+            };
+
+            var response = await httpClient.PostAsJsonAsync("http://localhost:5005/api/reminders", reminderDto);
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Failed to create appointment reminder: {Status}, {Error}", response.StatusCode, error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error synchronizing reminder for appointment {AppointmentId}", appointment.Id);
+        }
     }
 
     /// <summary>

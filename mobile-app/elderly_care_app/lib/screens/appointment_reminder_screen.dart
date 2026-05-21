@@ -46,11 +46,11 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
         ),
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              const Spacer(),
+              const SizedBox(height: 12),
 
               // Animated icon
               ScaleTransition(
@@ -171,7 +171,7 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
                 ),
               ),
 
-              const Spacer(),
+              const SizedBox(height: 32),
 
               if (!_acknowledged) ...[
                 ElevatedButton.icon(
@@ -212,7 +212,7 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
                   child: const Text('Quay lại trang chủ'),
                 ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
             ],
           ),
         ),

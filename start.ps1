@@ -10,5 +10,8 @@ foreach ($s in $allServices) {
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend/$s; dotnet run"
 }
 
+# 2b. Chạy SocketServer (Node.js)
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd backend/SocketServer; npm install; npm run dev"
+
 # 3. Chạy Frontend
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd web-app/elderly-care-web; npm run dev"

@@ -22,4 +22,30 @@ class HealthService {
       return [];
     }
   }
+  static Future<bool> addHealthLog({
+    int? systolic,
+    int? diastolic,
+    int? heartRate,
+  }) async {
+    try {
+      final userId = AuthService.currentUser?.userId;
+      if (userId == null) return false;
+
+      final nowString = DateTime.now().toUtc().toIso8601String();
+      final response = await ApiService.post('health-logs', {
+        'userId': userId,
+        'date': nowString,
+        'recordedAt': nowString,
+        'systolic': systolic,
+        'diastolic': diastolic,
+        'heartRate': heartRate,
+        'recordedBy': 'self',
+      });
+
+      return response.statusCode == 201 || response.statusCode == 200;
+    } catch (e) {
+      print('Error adding health log: $e');
+      return false;
+    }
+  }
 }

@@ -26,6 +26,7 @@ public interface INotificationService
     Task<List<NotificationSummaryDto>> GetNotificationsByUserIdAsync(Guid userId, int page = 1, int pageSize = 50);
     Task<NotificationDetailDto?> GetNotificationDetailAsync(Guid id);
     Task<NotificationSummaryDto?> MarkAsReadAsync(Guid id);
+    Task MarkAllAsReadAsync(Guid userId);
     Task<NotificationSummaryDto?> AcknowledgeAsync(Guid id);
     Task<NotificationSummaryDto?> RetryDeliveryAsync(Guid id);
 }
@@ -126,7 +127,7 @@ public class NotificationServiceImpl : INotificationService
     }
     
     /// <summary>
-    /// STATE TRANSITION: Delivered → Read
+    /// STATE TRANSITION: Any -> Read
     /// Idempotent: Can be called multiple times safely
     /// </summary>
     public async Task<NotificationSummaryDto?> MarkAsReadAsync(Guid id)
@@ -136,18 +137,8 @@ public class NotificationServiceImpl : INotificationService
         if (notification == null)
             return null;
         
-        // Validate state transition
-        if (notification.Status != NotificationStatus.Delivered)
-        {
-            _logger.LogWarning(
-                "Cannot mark notification {NotificationId} as read. Current status: {Status}",
-                id, notification.Status);
-            throw new InvalidOperationException(
-                $"Cannot mark as read. Notification must be in Delivered state. Current state: {notification.Status}");
-        }
-        
-        // Idempotent: If already read, just return
-        if (notification.ReadAt != null)
+        // Idempotent: If already read or acknowledged, just return
+        if (notification.Status == NotificationStatus.Read || notification.Status == NotificationStatus.Acknowledged)
         {
             return NotificationSummaryDto.FromEntity(notification);
         }
@@ -161,6 +152,27 @@ public class NotificationServiceImpl : INotificationService
         _logger.LogInformation("Marked notification {NotificationId} as read", id);
         
         return NotificationSummaryDto.FromEntity(notification);
+    }
+
+    /// <summary>
+    /// Mark all notifications for a user as read
+    /// </summary>
+    public async Task MarkAllAsReadAsync(Guid userId)
+    {
+        var now = DateTime.UtcNow;
+        var unreadNotifications = await _context.Notifications
+            .Where(n => n.UserId == userId && n.Status != NotificationStatus.Read && n.Status != NotificationStatus.Acknowledged)
+            .ToListAsync();
+
+        foreach (var n in unreadNotifications)
+        {
+            n.Status = NotificationStatus.Read;
+            n.ReadAt = now;
+            n.UpdatedAt = now;
+        }
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Marked all notifications for user {UserId} as read", userId);
     }
     
     /// <summary>

@@ -8,14 +8,14 @@ const SystemHealthSection = ({ data }: SystemHealthSectionProps) => {
     return (
         <div className="report-section slide-in">
             <div className="section-header">
-                <h2>System Health & Reliability</h2>
-                <p>Detecting systemic risks and integration failures.</p>
+                <h2>Sức Khỏe Hệ Thống & Độ Tin Cậy</h2>
+                <p>Phát hiện rủi ro hệ thống và lỗi tích hợp.</p>
             </div>
             <div className="section-grid">
                 <div className="stats-panel">
-                    <h3>Failed Notifications by Reason</h3>
+                    <h3>Thông Báo Lỗi Theo Nguyên Nhân</h3>
                     {data.systemHealth.failuresByReason.length === 0 ? (
-                        <p className="no-data">No failures recorded in this period.</p>
+                        <p className="no-data">Không có lỗi nào được ghi nhận trong thời gian này.</p>
                     ) : (
                         <ul className="fail-reasons">
                             {data.systemHealth.failuresByReason.map((r, i) => (
@@ -29,11 +29,11 @@ const SystemHealthSection = ({ data }: SystemHealthSectionProps) => {
                 </div>
                 <div className="stats-panel">
                     <div className="stat-row">
-                        <span>Retry Success Rate:</span>
+                        <span>Tỷ Lệ Thử Lại Thành Công:</span>
                         <strong>{data.systemHealth.retrySuccessRate}%</strong>
                     </div>
                     <div className="stat-row">
-                        <span>Avg Delivery Delay:</span>
+                        <span>Độ Trễ Giao Hàng TB:</span>
                         <strong>{data.systemHealth.averageDelayMs}ms</strong>
                     </div>
                 </div>

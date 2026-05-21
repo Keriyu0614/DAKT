@@ -42,6 +42,11 @@ public class HealthLog
     public double? Weight { get; set; }
 
     /// <summary>
+    /// Who recorded this health log: "self" (elderly user) or "caregiver"
+    /// </summary>
+    public string RecordedBy { get; set; } = "caregiver";
+
+    /// <summary>
     /// Timestamp when the health log was created
     /// </summary>
     public DateTime CreatedAt { get; set; }

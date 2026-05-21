@@ -83,14 +83,14 @@ export const AppointmentsPage = () => {
     };
 
     const handleCancelAppointment = async (apt: Appointment) => {
-        if (!window.confirm(`Are you sure you want to cancel the appointment with ${apt.doctorName}?`)) return;
+        if (!window.confirm(`Bạn có chắc muốn hủy lịch khám với ${apt.doctorName}?`)) return;
 
         try {
             await appointmentApi.delete(apt.id);
-            toast.info('Appointment cancelled.');
+            toast.info('Lịch khám đã được hủy.');
             fetchAppointments();
         } catch (err) {
-            toast.error('Failed to cancel appointment.');
+            toast.error('Không thể hủy lịch khám.');
         }
     };
 
@@ -98,9 +98,9 @@ export const AppointmentsPage = () => {
         const d = new Date(dateIso);
         return {
             day: d.getDate(),
-            month: d.toLocaleString('en-US', { month: 'short' }),
+            month: d.toLocaleString('vi-VN', { month: 'short' }),
             year: d.getFullYear(),
-            time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+            time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
         };
     };
 

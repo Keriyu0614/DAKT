@@ -42,8 +42,8 @@ export const ReportPage = () => {
             const report = await reportApi.generateReport(range);
             setData(report);
         } catch (error) {
-            console.error('Failed to load report data', error);
-            toast.error('Unable to load analytics. Please try again later.');
+            console.error('Lỗi tải dữ liệu báo cáo', error);
+            toast.error('Không thể tải dữ liệu phân tích. Vui lòng thử lại sau.');
         } finally {
             setLoading(false);
         }
@@ -64,9 +64,9 @@ export const ReportPage = () => {
                     exportHelpers.exportAsPDF(data);
                     break;
             }
-            toast.success(`${format.toUpperCase()} exported successfully`);
+            toast.success(`Đã xuất ${format.toUpperCase()} thành công`);
         } catch (error) {
-            toast.error(`Failed to export ${format.toUpperCase()}`);
+            toast.error(`Lỗi xuất ${format.toUpperCase()}`);
         }
     };
 
@@ -74,7 +74,7 @@ export const ReportPage = () => {
         return (
             <div className="report-loading">
                 <div className="spinner"></div>
-                <p>Aggregating system accountability metrics...</p>
+                <p>Đang tổng hợp dữ liệu hệ thống...</p>
             </div>
         );
     }
@@ -84,9 +84,9 @@ export const ReportPage = () => {
             {/* 1. Header & Global Controls */}
             <header className="report-header">
                 <div className="title-section">
-                    <h1 className="report-title">System Accountability Reports</h1>
+                    <h1 className="report-title">Báo Cáo Hệ Thống</h1>
                     <p className="report-subtitle">
-                        Compliance, safety audit, and system performance analytics (Read-Only)
+                        Phân tích tuân thủ, kiểm tra an toàn và hiệu suất hệ thống (Chỉ đọc)
                     </p>
                 </div>
 
@@ -94,21 +94,21 @@ export const ReportPage = () => {
                     <div className="range-selector">
                         <Calendar size={18} />
                         <select value={range} onChange={(e) => setRange(e.target.value as TimeRange)}>
-                            <option value="today">Today</option>
-                            <option value="7d">Last 7 Days</option>
-                            <option value="30d">Last 30 Days</option>
-                            <option value="custom">Custom Range</option>
+                            <option value="today">Hôm nay</option>
+                            <option value="7d">7 Ngày Qua</option>
+                            <option value="30d">30 Ngày Qua</option>
+                            <option value="custom">Tùy chỉnh</option>
                         </select>
                     </div>
 
                     <div className="export-dropdown">
                         <button className="export-main-btn">
-                            <Download size={18} /> Export <ChevronDown size={14} />
+                            <Download size={18} /> Xuất <ChevronDown size={14} />
                         </button>
                         <div className="export-menu">
-                            <button onClick={() => handleExport('pdf')}><CheckCircle2 size={16} /> PDF Summary</button>
-                            <button onClick={() => handleExport('csv')}><FileSpreadsheet size={16} /> Raw Data CSV</button>
-                            <button onClick={() => handleExport('json')}><FileJson size={16} /> Audit JSON</button>
+                            <button onClick={() => handleExport('pdf')}><CheckCircle2 size={16} /> Tóm tắt PDF</button>
+                            <button onClick={() => handleExport('csv')}><FileSpreadsheet size={16} /> Dữ liệu CSV</button>
+                            <button onClick={() => handleExport('json')}><FileJson size={16} /> Dữ liệu JSON</button>
                         </div>
                     </div>
                 </div>
@@ -119,20 +119,21 @@ export const ReportPage = () => {
 
             {/* 3. Report Categories Tabs */}
             <nav className="report-tabs">
+                <button className={activeTab === 'reminders' ? 'active' : ''} onClick={() => setActiveTab('reminders')}></button>
                 <button className={activeTab === 'reminders' ? 'active' : ''} onClick={() => setActiveTab('reminders')}>
-                    <Bell size={18} /> Reminder Performance
+                    <Bell size={18} /> Hiệu Suất Nhắc Nhở
                 </button>
                 <button className={activeTab === 'notifications' ? 'active' : ''} onClick={() => setActiveTab('notifications')}>
-                    <ShieldCheck size={18} /> Notification Delivery
+                    <ShieldCheck size={18} /> Gửi Thông Báo
                 </button>
                 <button className={activeTab === 'adherence' ? 'active' : ''} onClick={() => setActiveTab('adherence')}>
-                    <Pill size={18} /> Med Adherence
+                    <Pill size={18} /> Tuân Thủ Thuốc
                 </button>
                 <button className={activeTab === 'appointments' ? 'active' : ''} onClick={() => setActiveTab('appointments')}>
-                    <Calendar size={18} /> Appointments
+                    <Calendar size={18} /> Lịch Khám
                 </button>
                 <button className={activeTab === 'system' ? 'active' : ''} onClick={() => setActiveTab('system')}>
-                    <Activity size={18} /> System Health
+                    <Activity size={18} /> Sức Khỏe Hệ Thống
                 </button>
             </nav>
 
@@ -149,10 +150,10 @@ export const ReportPage = () => {
             <footer className="report-footer">
                 <div className="disclaimer">
                     <ShieldCheck size={16} />
-                    <span>Selected Date Range: {data.metadata.range} | Report Generated: {new Date(data.metadata.timestamp).toLocaleString()} | System v{data.metadata.version}</span>
+                    <span>Khoảng thời gian: {data.metadata.range} | Ngày tạo: {new Date(data.metadata.timestamp).toLocaleString()} | Hệ thống v{data.metadata.version}</span>
                 </div>
                 <p className="legal-notice">
-                    This report is for audit and accountability purposes. Do not use for immediate clinical intervention.
+                    Báo cáo này dùng cho mục đích kiểm tra và trách nhiệm. Không sử dụng cho can thiệp lâm sàng tức thời.
                 </p>
             </footer>
         </div>

@@ -31,7 +31,7 @@ const AddElderlyModal: React.FC<AddElderlyModalProps> = ({ isOpen, onClose, onSu
                 password,
                 caregiverId: user.id
             });
-            toast.success('Account created and linked successfully!');
+            toast.success('Tạo và liên kết tài khoản thành công!');
             onSuccess();
             onClose();
             // Clear form
@@ -40,7 +40,7 @@ const AddElderlyModal: React.FC<AddElderlyModalProps> = ({ isOpen, onClose, onSu
             setPassword('');
         } catch (err: any) {
             console.error(err);
-            toast.error(err?.response?.data?.message || 'Failed to create account');
+            toast.error(err?.response?.data?.message || 'Không thể tạo tài khoản');
         } finally {
             setLoading(false);
         }

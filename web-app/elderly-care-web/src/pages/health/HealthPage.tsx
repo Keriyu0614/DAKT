@@ -40,7 +40,7 @@ export const HealthPage = () => {
             setFetchError('');
         } catch (err) {
             console.error(err);
-            setFetchError('Unable to load health records. Please try again later.');
+            setFetchError('Không thể tải hồ sơ sức khỏe. Vui lòng thử lại sau.');
         }
     };
 
@@ -132,8 +132,8 @@ export const HealthPage = () => {
     return (
         <div className="health-page-container">
             <header className="health-header">
-                <h1>Health Records</h1>
-                <p>Track and review daily health measurements over time to monitor elderly well-being.</p>
+                <h1>Hồ Sơ Sức Khỏe</h1>
+                <p>Theo dõi và xem lại các chỉ số sức khỏe hàng ngày để quản lý tình trạng sức khỏe của người cao tuổi.</p>
             </header>
 
             {fetchError && (
@@ -145,7 +145,7 @@ export const HealthPage = () => {
 
             <div className="health-content">
                 <section className="health-section">
-                    <h2 className="section-title"><ChevronRight size={24} /> Latest Recorded Values</h2>
+                    <h2 className="section-title"><ChevronRight size={24} /> Chỉ số mới nhất</h2>
                     <div className="status-grid">
                         <HealthStatusCard
                             type="bloodPressure"
@@ -167,11 +167,11 @@ export const HealthPage = () => {
 
                 <section className="health-section">
                     <div className="trends-header">
-                        <h2 className="section-title">Health Trends</h2>
+                        <h2 className="section-title">Xu Hướng Sức Khỏe</h2>
                         <div className="metric-toggles">
                             {(['bloodPressure', 'heartRate', 'weight'] as const).map(m => (
                                 <button key={m} className={`metric-toggle ${activeMetric === m ? 'active' : ''}`} onClick={() => setActiveMetric(m)}>
-                                    {m === 'bloodPressure' ? 'BP' : m === 'heartRate' ? 'HR' : 'Weight'}
+                                    {m === 'bloodPressure' ? 'Huyết áp' : m === 'heartRate' ? 'Nhịp tim' : 'Cân nặng'}
                                 </button>
                             ))}
                         </div>
@@ -184,10 +184,10 @@ export const HealthPage = () => {
                 </section>
 
                 <section className="health-section">
-                    <h2 className="section-title">History Logs</h2>
+                    <h2 className="section-title">Nhật ký lịch sử</h2>
                     <div className="history-list">
                         {logs.length === 0 ? (
-                            <p className="empty-text">No health records found.</p>
+                            <p className="empty-text">Không tìm thấy hồ sơ sức khỏe nào.</p>
                         ) : (
                             logs.map(log => (
                                 <HealthHistoryItem
@@ -203,7 +203,7 @@ export const HealthPage = () => {
             </div>
 
             <button className="add-log-trigger" onClick={() => handleOpenEntry()}>
-                <Plus size={20} /> Add Record
+                <Plus size={20} /> Thêm Hồ Sơ
             </button>
         </div>
     );

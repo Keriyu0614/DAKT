@@ -58,7 +58,7 @@ export const HomePage = () => {
                         </button>
                     </div>
                 </div>
-                <div className="hero-image">
+                {/* <div className="hero-image">
                     <div className="hero-visual">
                         <div className="hero-visual-header">
                             <div className="hero-avatar">👴</div>
@@ -100,7 +100,7 @@ export const HomePage = () => {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> */}
             </section>
 
             {/* Features */}
@@ -199,7 +199,7 @@ export const HomePage = () => {
             </section>
 
             {/* Trust */}
-            <section className="trust-section">
+            {/* <section className="trust-section">
                 <div className="trust-inner">
                     <ShieldCheck size={40} color="#0ea5e9" />
                     <h2>Độ tin cậy cấp y tế</h2>
@@ -208,16 +208,16 @@ export const HomePage = () => {
                         Đảm bảo mọi nhắc nhở đều được gửi đi và mọi dữ liệu sức khỏe đều được lưu trữ an toàn.
                     </p>
                 </div>
-            </section>
+            </section> */}
 
             {/* CTA */}
-            <section className="cta-section">
+            {/* <section className="cta-section">
                 <h2>Sẵn sàng đơn giản hóa việc chăm sóc?</h2>
                 <p>Tham gia cùng hàng nghìn người chăm sóc đang tin dùng CareLink mỗi ngày.</p>
                 <button onClick={handleRegister} className="cta-btn">
                     Bắt đầu miễn phí <ArrowRight size={20} />
                 </button>
-            </section>
+            </section> */}
 
             {/* Footer */}
             <footer className="homepage-footer">

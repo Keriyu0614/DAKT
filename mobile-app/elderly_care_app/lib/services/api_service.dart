@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 class ApiService {
   // Use 10.0.2.2 for Android Emulator, localhost for iOS/Web
   static const String baseUrl = 'http://192.168.0.160:5041/api';
+  static const String serverUrl = 'http://192.168.0.160:5041';
   
   static String? _token;
 
@@ -48,5 +49,26 @@ class ApiService {
       headers: _headers,
     );
     return response;
+  }
+
+  static Future<http.Response> patch(String endpoint, dynamic data) async {
+    final response = await http.patch(
+      Uri.parse('$baseUrl/$endpoint'),
+      headers: _headers,
+      body: data != null ? jsonEncode(data) : null,
+    );
+    return response;
+  }
+
+  static Future<http.StreamedResponse> uploadFile(String endpoint, String filePath, String fieldName) async {
+    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/$endpoint'));
+    
+    if (_token != null) {
+      request.headers['Authorization'] = 'Bearer $_token';
+    }
+    
+    request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
+    
+    return await request.send();
   }
 }

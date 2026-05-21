@@ -1,11 +1,12 @@
 import { useAuth } from "../../context/AuthContext";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
+import NotificationBell from "./NotificationBell";
 import "./Header.css";
 
 export default function Header() {
   const { user, logout } = useAuth();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -13,21 +14,14 @@ export default function Header() {
     navigate("/login");
   };
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'en' ? 'vn' : 'en';
-    i18n.changeLanguage(newLang);
-  };
-
   return (
     <header className="app-header">
       <div className="header-left">
-        <h2 className="app-logo">Elderly Care</h2>
-        <button onClick={toggleLanguage} className="lang-button">
-          {i18n.language === 'en' ? '🇻🇳 VN' : '🇺🇸 EN'}
-        </button>
+        <h2 className="app-logo">Chăm Sóc Người Cao Tuổi</h2>
       </div>
 
       <div className="header-right">
+        {user && <NotificationBell />}
         {user && (
           <Link to="/app/profile" className="user-info-link">
             <div className="user-info">

@@ -31,8 +31,12 @@ export interface ReminderExtended extends Reminder {
 }
 
 export const reminderApi = {
-    getReminders: (): Promise<AxiosResponse<Reminder[]>> =>
-        axiosClient.get("/api/reminders"),
+    getReminders: (userId?: string): Promise<AxiosResponse<Reminder[]>> => {
+        if (userId) {
+            return axiosClient.get(`/api/reminders/user/${userId}`);
+        }
+        return axiosClient.get("/api/reminders");
+    },
 
     createReminder: (payload: CreateReminderPayload): Promise<AxiosResponse<Reminder>> =>
         axiosClient.post("/api/reminders", payload),

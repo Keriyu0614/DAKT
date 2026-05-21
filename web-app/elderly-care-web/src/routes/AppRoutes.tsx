@@ -19,7 +19,7 @@ import { ElderlyPage } from "../pages/userelderly/ElderlyPage";
 
 export default function AppRoutes() {
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         {/* Public */}
         <Route path="/" element={<HomePage />} />

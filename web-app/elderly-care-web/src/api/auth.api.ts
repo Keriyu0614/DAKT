@@ -18,6 +18,19 @@ export interface AuthResponse {
     email: string;
     role: string;
     token: string;
+    avatarUrl?: string;
+}
+
+export interface UpdateProfileRequest {
+    name: string;
+    avatarUrl?: string;
+}
+
+export interface UserSettings {
+    language: string;
+    theme: string;
+    notificationsEnabled: boolean;
+    autoLogout: boolean;
 }
 
 const authApi = {
@@ -35,6 +48,25 @@ const authApi = {
     },
     getManagedElderly: (caregiverId: string) => {
         return axiosClient.get<any[]>(`/api/auth/managed-elderly/${caregiverId}`);
+    },
+    unlinkElderly: (caregiverId: string, elderlyId: string) => {
+        return axiosClient.delete(`/api/auth/unlink-elderly/${caregiverId}/${elderlyId}`);
+    },
+    updateProfile: (userId: string, data: UpdateProfileRequest) => {
+        return axiosClient.put<AuthResponse>(`/api/auth/profile/${userId}`, data);
+    },
+    uploadAvatar: (userId: string, file: File) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return axiosClient.post<{ avatarUrl: string }>(`/api/auth/avatar/${userId}`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+    },
+    getSettings: (userId: string) => {
+        return axiosClient.get<UserSettings>(`/api/auth/settings/${userId}`);
+    },
+    updateSettings: (userId: string, data: UserSettings) => {
+        return axiosClient.put<UserSettings>(`/api/auth/settings/${userId}`, data);
     },
 };
 

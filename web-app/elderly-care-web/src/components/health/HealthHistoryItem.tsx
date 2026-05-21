@@ -18,6 +18,21 @@ const HealthHistoryItem = ({ log, onEdit, getStatus }: HealthHistoryItemProps) =
                 <span style={{ fontWeight: 400, fontSize: '0.8rem' }}>
                     {new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
+                {log.recordedBy === 'self' && (
+                    <div style={{
+                        marginTop: '4px',
+                        display: 'inline-block',
+                        backgroundColor: '#dcfce7',
+                        color: '#15803d',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        border: '1px solid #bbf7d0'
+                    }}>
+                        Tự ghi
+                    </div>
+                )}
             </div>
             <div className="history-metrics">
                 <div className="history-metric">

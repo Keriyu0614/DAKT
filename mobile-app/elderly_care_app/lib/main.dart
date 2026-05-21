@@ -1,8 +1,13 @@
+//mobile-app/elderly_care_app/lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'screens/login_screen.dart';
+import 'services/local_notification_service.dart';
+import 'services/socket_service.dart';
 
-void main() {
+final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -10,6 +15,8 @@ void main() {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
+  await LocalNotificationService.init();
+  SocketService.connect();
   runApp(const ElderCareApp());
 }
 
@@ -22,6 +29,7 @@ class ElderCareApp extends StatelessWidget {
       title: 'CareRemind',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
+      navigatorObservers: [routeObserver],
       home: const LoginScreen(),
     );
   }

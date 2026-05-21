@@ -29,37 +29,37 @@ const NotificationDetailModal = ({ detail, onClose }: NotificationDetailModalPro
             case NotificationStatus.Delivered:
                 return {
                     icon: <CheckCircle2 size={16} />,
-                    text: 'Delivered',
+                    text: 'Đã giao',
                     className: 'status-delivered'
                 };
             case NotificationStatus.Read:
                 return {
                     icon: <Eye size={16} />,
-                    text: 'Read',
+                    text: 'Đã đọc',
                     className: 'status-read'
                 };
             case NotificationStatus.Acknowledged:
                 return {
                     icon: <CheckCheck size={16} />,
-                    text: 'Acknowledged',
+                    text: 'Đã xác nhận',
                     className: 'status-acknowledged'
                 };
             case NotificationStatus.Failed:
                 return {
                     icon: <AlertCircle size={16} />,
-                    text: 'Failed',
+                    text: 'Thất bại',
                     className: 'status-failed'
                 };
             case NotificationStatus.Retrying:
                 return {
                     icon: <ClockIcon size={16} />,
-                    text: 'Retrying',
+                    text: 'Đang thử lại',
                     className: 'status-retrying'
                 };
             default:
                 return {
                     icon: <Bell size={16} />,
-                    text: 'Unknown',
+                    text: 'Không xác định',
                     className: 'status-unknown'
                 };
         }
@@ -67,24 +67,24 @@ const NotificationDetailModal = ({ detail, onClose }: NotificationDetailModalPro
 
     const getChannelText = (channel: DeliveryChannel) => {
         switch (channel) {
-            case DeliveryChannel.MobilePush: return 'Mobile Push';
+            case DeliveryChannel.MobilePush: return 'Thông báo di động';
             case DeliveryChannel.Email: return 'Email';
             case DeliveryChannel.SMS: return 'SMS';
-            case DeliveryChannel.InApp: return 'In-App';
-            default: return 'Unknown';
+            case DeliveryChannel.InApp: return 'Trong ứng dụng';
+            default: return 'Không xác định';
         }
     };
 
     const getRecipientText = (type: RecipientType) => {
-        return type === RecipientType.ElderlyUser ? 'Elderly User' : 'Caregiver';
+        return type === RecipientType.ElderlyUser ? 'Người cao tuổi' : 'Người chăm sóc';
     };
 
     const getSourceEventText = (type: SourceEventType) => {
         switch (type) {
-            case SourceEventType.Medication: return 'Medication';
-            case SourceEventType.Appointment: return 'Appointment';
-            case SourceEventType.Health: return 'Health';
-            default: return 'Unknown';
+            case SourceEventType.Medication: return 'Thuốc';
+            case SourceEventType.Appointment: return 'Lịch khám';
+            case SourceEventType.Health: return 'Sức khỏe';
+            default: return 'Không xác định';
         }
     };
 
@@ -105,7 +105,7 @@ const NotificationDetailModal = ({ detail, onClose }: NotificationDetailModalPro
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content detail-modal" onClick={e => e.stopPropagation()}>
                 <div className="modal-header">
-                    <h2>Notification Details</h2>
+                    <h2>Chi tiết Thông báo</h2>
                     <button className="btn-close" onClick={onClose}>
                         <X size={24} />
                     </button>
@@ -122,42 +122,42 @@ const NotificationDetailModal = ({ detail, onClose }: NotificationDetailModalPro
 
                     {/* Full Message */}
                     <section className="detail-section">
-                        <h4>Full Message</h4>
+                        <h4>Tin nhắn đầy đủ</h4>
                         <p>{detail.message}</p>
                     </section>
 
                     {/* Delivery Information */}
                     <section className="detail-section">
-                        <h4>Delivery Information</h4>
+                        <h4>Thông tin Giao hàng</h4>
                         <div className="detail-info-grid">
                             <div className="info-item">
-                                <span className="info-label">Sent at:</span>
+                                <span className="info-label">Đã gửi lúc:</span>
                                 <span>{formatTime(detail.sentAt)}</span>
                             </div>
                             {detail.deliveredAt && (
                                 <div className="info-item">
-                                    <span className="info-label">Delivered at:</span>
+                                    <span className="info-label">Đã giao lúc:</span>
                                     <span>{formatTime(detail.deliveredAt)}</span>
                                 </div>
                             )}
                             {detail.readAt && (
                                 <div className="info-item">
-                                    <span className="info-label">Read at:</span>
+                                    <span className="info-label">Đã đọc lúc:</span>
                                     <span>{formatTime(detail.readAt)}</span>
                                 </div>
                             )}
                             {detail.acknowledgedAt && (
                                 <div className="info-item">
-                                    <span className="info-label">Acknowledged at:</span>
+                                    <span className="info-label">Đã xác nhận lúc:</span>
                                     <span>{formatTime(detail.acknowledgedAt)}</span>
                                 </div>
                             )}
                             <div className="info-item">
-                                <span className="info-label">Channel:</span>
+                                <span className="info-label">Kênh:</span>
                                 <span>{getChannelText(detail.deliveryChannel)}</span>
                             </div>
                             <div className="info-item">
-                                <span className="info-label">Recipient:</span>
+                                <span className="info-label">Người nhận:</span>
                                 <span>{getRecipientText(detail.recipientType)}</span>
                             </div>
                         </div>
@@ -165,23 +165,23 @@ const NotificationDetailModal = ({ detail, onClose }: NotificationDetailModalPro
 
                     {/* Source Event */}
                     <section className="detail-section">
-                        <h4>Source Event</h4>
+                        <h4>Sự kiện Nguồn</h4>
                         <div className="detail-info-grid">
                             <div className="info-item">
-                                <span className="info-label">Reminder ID:</span>
+                                <span className="info-label">ID Nhắc nhở:</span>
                                 <span>{detail.sourceReminderId}</span>
                             </div>
                             <div className="info-item">
-                                <span className="info-label">Event Type:</span>
+                                <span className="info-label">Loại Sự kiện:</span>
                                 <span>{getSourceEventText(detail.sourceEventType)}</span>
                             </div>
                             <div className="info-item">
-                                <span className="info-label">Event ID:</span>
+                                <span className="info-label">ID Sự kiện:</span>
                                 <span>{detail.sourceEventId}</span>
                             </div>
                             {detail.sourceEvent && (
                                 <div className="info-item">
-                                    <span className="info-label">Event Name:</span>
+                                    <span className="info-label">Tên Sự kiện:</span>
                                     <span>{detail.sourceEvent.name}</span>
                                 </div>
                             )}
@@ -191,7 +191,7 @@ const NotificationDetailModal = ({ detail, onClose }: NotificationDetailModalPro
                     {/* Delivery Attempts */}
                     {detail.deliveryAttempts && detail.deliveryAttempts.length > 0 && (
                         <section className="detail-section">
-                            <h4>Delivery Attempts</h4>
+                            <h4>Nỗ lực Giao hàng</h4>
                             <div className="delivery-attempts">
                                 {detail.deliveryAttempts.map((attempt, idx) => (
                                     <div key={idx} className={`attempt-item ${attempt.status.toLowerCase()}`}>
@@ -211,7 +211,7 @@ const NotificationDetailModal = ({ detail, onClose }: NotificationDetailModalPro
 
                 <div className="modal-footer">
                     <button className="btn-secondary" onClick={onClose}>
-                        Close
+                        Đóng
                     </button>
                 </div>
             </div>

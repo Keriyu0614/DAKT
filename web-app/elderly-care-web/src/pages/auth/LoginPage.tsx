@@ -20,7 +20,7 @@ export const LoginPage = () => {
         e.preventDefault();
 
         if (!email || !password) {
-            setError("Please enter both email and password.");
+            setError("Vui lòng nhập cả email và mật khẩu.");
             return;
         }
 
@@ -40,7 +40,7 @@ export const LoginPage = () => {
 
             navigate("/app");
         } catch (err: any) {
-            const msg = err?.response?.data?.message || "Login failed. Please check your credentials.";
+            const msg = err?.response?.data?.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.";
             setError(msg);
             toast.error(msg);
         } finally {
@@ -61,10 +61,10 @@ export const LoginPage = () => {
             const response = await authApi.googleLogin(credentialResponse.credential);
             login(response.data);
             navigate("/app");
-            toast.success("Logged in with Google!");
+            toast.success("Đăng nhập bằng Google thành công!");
         } catch (err: any) {
             console.error(err);
-            toast.error("Google login failed");
+            toast.error("Đăng nhập bằng Google thất bại");
         } finally {
             setLoading(false);
         }
@@ -73,9 +73,9 @@ export const LoginPage = () => {
     return (
         <div style={styles.container}>
             <div style={styles.card}>
-                <h1 style={styles.title}>Login</h1>
+                <h1 style={styles.title}>Đăng nhập</h1>
                 <p style={styles.subtitle}>
-                    Sign in to manage your medications and health information
+                    Đăng nhập để quản lý thông tin thuốc và sức khỏe của bạn
                 </p>
 
 
@@ -83,42 +83,42 @@ export const LoginPage = () => {
 
                 <form onSubmit={handleLogin} style={styles.form}>
                     <div style={styles.formGroup}>
-                        <label style={styles.label}>Email Address</label>
+                        <label style={styles.label}>Địa chỉ Email</label>
                         <input
                             style={styles.input}
                             type="email"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Enter your email"
+                            placeholder="Nhập email của bạn"
                         />
                     </div>
 
                     <div style={styles.formGroup}>
-                        <label style={styles.label}>Password</label>
+                        <label style={styles.label}>Mật khẩu</label>
                         <input
                             style={styles.input}
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter your password"
+                            placeholder="Nhập mật khẩu của bạn"
                         />
                     </div>
 
                     <button type="submit" style={styles.loginButton} disabled={loading}>
-                        {loading ? "Logging in..." : "Login"}
+                        {loading ? "Đang đăng nhập..." : "Đăng nhập"}
                     </button>
                 </form>
 
                 <div style={styles.divider}>
                     <span style={styles.dividerLine}></span>
-                    <span style={styles.dividerText}>OR</span>
+                    <span style={styles.dividerText}>HOẶC</span>
                     <span style={styles.dividerLine}></span>
                 </div>
 
                 <div style={styles.googleWrapper}>
                     <GoogleLogin
                         onSuccess={handleGoogleSuccess}
-                        onError={() => toast.error("Google Login Failed")}
+                        onError={() => toast.error("Đăng nhập Google thất bại")}
                         useOneTap
                         theme="filled_blue"
                         shape="pill"
@@ -127,9 +127,9 @@ export const LoginPage = () => {
                 </div>
 
                 <div style={styles.footer}>
-                    <p style={styles.footerText}>Don't have an account?</p>
+                    <p style={styles.footerText}>Bạn chưa có tài khoản?</p>
                     <button onClick={handleGoToRegister} style={styles.linkButton}>
-                        Create an account
+                        Tạo tài khoản mới
                     </button>
                 </div>
             </div>
@@ -224,7 +224,7 @@ const styles: Record<string, React.CSSProperties> = {
     linkButton: {
         background: "none",
         border: "none",
-        color: "#27ae60",
+        color: "#2980B9",
         fontSize: "18px",
         fontWeight: "bold",
         cursor: "pointer",

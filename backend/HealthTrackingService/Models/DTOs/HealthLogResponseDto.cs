@@ -12,6 +12,7 @@ public class HealthLogResponseDto
     public int? HeartRate { get; set; }
     public string? Note { get; set; }
     public double? Weight { get; set; }
+    public string RecordedBy { get; set; } = "caregiver";
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
@@ -29,8 +30,10 @@ public class HealthLogResponseDto
             HeartRate = healthLog.HeartRate,
             Note = healthLog.Note,
             Weight = healthLog.Weight,
+            RecordedBy = healthLog.RecordedBy,
             CreatedAt = DateTime.SpecifyKind(healthLog.CreatedAt, DateTimeKind.Utc),
             UpdatedAt = DateTime.SpecifyKind(healthLog.UpdatedAt, DateTimeKind.Utc)
         };
     }
 }
+

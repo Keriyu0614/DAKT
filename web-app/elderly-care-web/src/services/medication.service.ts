@@ -9,26 +9,17 @@ import { medicationMockService } from '../api/medication.mock';
 
 export const medicationService = {
 
-    getMedications: async (): Promise<Medication[]> => {
-        if (import.meta.env.DEV) {
-            return await medicationMockService.getMedications();
-        }
-        const response = await medicationApi.getMedications();
+    getMedications: async (userId?: string): Promise<Medication[]> => {
+        const response = await medicationApi.getMedications(userId);
         return response.data.map(mapDtoToFrontend);
     },
 
-    addMedication: async (payload: Omit<Medication, 'id' | 'userId' | 'linkedRemindersCount' | 'createdAt' | 'updatedAt'>): Promise<Medication> => {
+    addMedication: async (payload: Medication): Promise<Medication> => {
         console.log('[MedicationService] Adding new medication...');
 
-        let newMed: Medication;
-        if (import.meta.env.DEV) {
-            newMed = await medicationMockService.addMedication(payload);
-        } else {
-            const dto = mapFrontendToCreateDto(payload);
-            dto.userId = "00000000-0000-0000-0000-000000000001";
-            const response = await medicationApi.createMedication(dto);
-            newMed = mapDtoToFrontend(response.data);
-        }
+        const dto = mapFrontendToCreateDto(payload);
+        const response = await medicationApi.createMedication(dto);
+        const newMed = mapDtoToFrontend(response.data);
 
         // 2. Trigger Side Effects (Generate Reminders)
         await medicationReminderGenerator.generateReminders(newMed);
@@ -39,14 +30,9 @@ export const medicationService = {
     updateMedication: async (id: string, updates: Partial<Medication>): Promise<Medication> => {
         console.log(`[MedicationService] Updating medication ${id}...`);
 
-        let updatedMed: Medication;
-        if (import.meta.env.DEV) {
-            updatedMed = await medicationMockService.updateMedication(id, updates);
-        } else {
-            const dto = mapFrontendToUpdateDto(updates);
-            const response = await medicationApi.updateMedication(id, dto);
-            updatedMed = mapDtoToFrontend(response.data);
-        }
+        const dto = mapFrontendToUpdateDto(updates);
+        const response = await medicationApi.updateMedication(id, dto);
+        const updatedMed = mapDtoToFrontend(response.data);
 
         // 2. Trigger Side Effects
         if (updates.frequency || updates.startDate || updates.endDate || updates.status || updates.dosage) {
@@ -59,14 +45,9 @@ export const medicationService = {
     toggleStatus: async (med: Medication): Promise<Medication> => {
         console.log(`[MedicationService] Toggling status for ${med.id}...`);
 
-        let updatedMed: Medication;
-        if (import.meta.env.DEV) {
-            updatedMed = await medicationMockService.toggleStatus(med.id);
-        } else {
-            // Since backend doesn't support status, we just simulate the toggle and side effects for now
-            const newStatus: Medication['status'] = med.status === 'Active' ? 'Paused' : 'Active';
-            updatedMed = { ...med, status: newStatus };
-        }
+        // Since backend doesn't support status, we just simulate the toggle and side effects for now
+        const newStatus: Medication['status'] = med.status === 'Active' ? 'Paused' : 'Active';
+        const updatedMed = { ...med, status: newStatus };
 
         // Trigger Side Effects
         if (updatedMed.status === 'Paused') {
@@ -80,11 +61,7 @@ export const medicationService = {
 
     deleteMedication: async (id: string): Promise<void> => {
         console.log(`[MedicationService] Deleting medication ${id}...`);
-        if (import.meta.env.DEV) {
-            await medicationMockService.deleteMedication(id);
-        } else {
-            await medicationApi.deleteMedication(id);
-        }
+        await medicationApi.deleteMedication(id);
         await medicationReminderGenerator.cancelReminders(id);
     }
 };

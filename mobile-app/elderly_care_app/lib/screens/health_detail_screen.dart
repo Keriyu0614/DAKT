@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../main.dart';
+import '../services/health_service.dart';
+import '../models/health_log_model.dart';
+import 'quick_health_entry_screen.dart';
 
 class HealthDetailScreen extends StatefulWidget {
   const HealthDetailScreen({super.key});
@@ -10,6 +14,66 @@ class HealthDetailScreen extends StatefulWidget {
 
 class _HealthDetailScreenState extends State<HealthDetailScreen> {
   bool _showHealthCheck = false;
+  List<HealthLogModel> _healthLogs = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLogs();
+  }
+
+  Future<void> _fetchLogs() async {
+    setState(() => _isLoading = true);
+    try {
+      final logs = await HealthService.getMyHealthLogs();
+      setState(() {
+        _healthLogs = logs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading logs: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final localDate = date.toLocal();
+    final checkDate = DateTime(localDate.year, localDate.month, localDate.day);
+
+    if (checkDate == today) {
+      return 'Hôm nay';
+    } else if (checkDate == yesterday) {
+      return 'Hôm qua';
+    } else {
+      return DateFormat('dd/MM').format(localDate);
+    }
+  }
+
+  String _getStatus(HealthLogModel log) {
+    final bp = log.bloodPressure;
+    if (bp.isNotEmpty && bp != '-') {
+      final parts = bp.split('/');
+      if (parts.length == 2) {
+        final sys = int.tryParse(parts[0]);
+        final dia = int.tryParse(parts[1]);
+        if (sys != null && (sys > 140 || sys < 90)) return 'Chú ý';
+        if (dia != null && (dia > 90 || dia < 60)) return 'Chú ý';
+      }
+    }
+    final hr = log.heartRate;
+    if (hr != null && (hr > 100 || hr < 50)) {
+      return 'Chú ý';
+    }
+    return 'Bình thường';
+  }
+
+  bool _isStatusOk(HealthLogModel log) {
+    return _getStatus(log) == 'Bình thường';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,164 +81,236 @@ class _HealthDetailScreenState extends State<HealthDetailScreen> {
       return HealthCheckScreen(onBack: () => setState(() => _showHealthCheck = false));
     }
 
+    // Determine current values based on latest log (if any)
+    String bpValue = '118/76';
+    String bpStatus = 'Bình thường';
+    bool bpStatusOk = true;
+
+    String hrValue = '72';
+    String hrStatus = 'Bình thường';
+    bool hrStatusOk = true;
+
+    if (_healthLogs.isNotEmpty) {
+      // Find latest log with blood pressure
+      try {
+        final latestBpLog = _healthLogs.firstWhere(
+          (log) => log.bloodPressure.isNotEmpty && log.bloodPressure != '-',
+        );
+        bpValue = latestBpLog.bloodPressure;
+        final isOk = _isStatusOk(latestBpLog);
+        bpStatus = isOk ? 'Bình thường' : 'Chú ý';
+        bpStatusOk = isOk;
+      } catch (_) {}
+
+      // Find latest log with heart rate
+      try {
+        final latestHrLog = _healthLogs.firstWhere(
+          (log) => log.heartRate != null,
+        );
+        hrValue = latestHrLog.heartRate.toString();
+        final isOk = _isStatusOk(latestHrLog);
+        hrStatus = isOk ? 'Bình thường' : 'Chú ý';
+        hrStatusOk = isOk;
+      } catch (_) {}
+    }
+
+    final List<Map<String, String>> historyList = [];
+    if (_healthLogs.isNotEmpty) {
+      for (var log in _healthLogs) {
+        historyList.add({
+          'date': _formatDate(log.date),
+          'bp': log.bloodPressure.isNotEmpty ? log.bloodPressure : '-',
+          'hr': log.heartRate != null ? log.heartRate.toString() : '-',
+          'status': _isStatusOk(log) ? 'Tốt' : 'Chú ý',
+        });
+      }
+    } else {
+      historyList.addAll([
+        {'date': 'Hôm nay', 'bp': '118/76', 'hr': '72', 'status': 'Tốt'},
+        {'date': 'Hôm qua', 'bp': '122/80', 'hr': '75', 'status': 'Tốt'},
+        {'date': '30/04', 'bp': '130/85', 'hr': '78', 'status': 'Chú ý'},
+        {'date': '29/04', 'bp': '120/78', 'hr': '74', 'status': 'Tốt'},
+        {'date': '28/04', 'bp': '116/74', 'hr': '71', 'status': 'Tốt'},
+      ]);
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.surface,
       appBar: AppBar(title: const Text('Chi tiết sức khoẻ')),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header metric cards
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetricCard(
-                      label: 'Huyết áp',
-                      value: '118/76',
-                      unit: 'mmHg',
-                      icon: Icons.favorite_rounded,
-                      color: AppTheme.danger,
-                      status: 'Bình thường',
-                      statusOk: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _MetricCard(
-                      label: 'Nhịp tim',
-                      value: '72',
-                      unit: 'bpm',
-                      icon: Icons.monitor_heart_rounded,
-                      color: AppTheme.primary,
-                      status: 'Bình thường',
-                      statusOk: true,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetricCard(
-                      label: 'Đường huyết',
-                      value: '6.4',
-                      unit: 'mmol/L',
-                      icon: Icons.water_drop_rounded,
-                      color: const Color(0xFF8B5CF6),
-                      status: 'Chú ý',
-                      statusOk: false,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _MetricCard(
-                      label: 'Cân nặng',
-                      value: '68',
-                      unit: 'kg',
-                      icon: Icons.monitor_weight_rounded,
-                      color: AppTheme.warning,
-                      status: 'Bình thường',
-                      statusOk: true,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Health check CTA
-              GestureDetector(
-                onTap: () => setState(() => _showHealthCheck = true),
-                child: Container(
+        child: _isLoading && _healthLogs.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _fetchLogs,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primary.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(Icons.quiz_rounded,
-                            color: Colors.white, size: 28),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Đánh giá sức khoẻ hôm nay',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
+                      // Header metric cards
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _MetricCard(
+                              label: 'Huyết áp',
+                              value: bpValue,
+                              unit: 'mmHg',
+                              icon: Icons.favorite_rounded,
+                              color: AppTheme.danger,
+                              status: bpStatus,
+                              statusOk: bpStatusOk,
                             ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Trả lời vài câu hỏi nhanh để theo dõi sức khoẻ',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 13,
-                              ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _MetricCard(
+                              label: 'Nhịp tim',
+                              value: hrValue,
+                              unit: 'bpm',
+                              icon: Icons.monitor_heart_rounded,
+                              color: AppTheme.primary,
+                              status: hrStatus,
+                              statusOk: hrStatusOk,
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _MetricCard(
+                              label: 'Đường huyết',
+                              value: '6.4',
+                              unit: 'mmol/L',
+                              icon: Icons.water_drop_rounded,
+                              color: const Color(0xFF8B5CF6),
+                              status: 'Chú ý',
+                              statusOk: false,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _MetricCard(
+                              label: 'Cân nặng',
+                              value: '68',
+                              unit: 'kg',
+                              icon: Icons.monitor_weight_rounded,
+                              color: AppTheme.warning,
+                              status: 'Bình thường',
+                              statusOk: true,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Health check CTA
+                      GestureDetector(
+                        onTap: () => setState(() => _showHealthCheck = true),
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppTheme.primary.withOpacity(0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Icon(Icons.quiz_rounded,
+                                    color: Colors.white, size: 28),
+                              ),
+                              const SizedBox(width: 16),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Đánh giá sức khoẻ hôm nay',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      'Trả lời vài câu hỏi nhanh để theo dõi sức khoẻ',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.arrow_forward_ios_rounded,
+                                  color: Colors.white, size: 18),
+                            ],
+                          ),
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios_rounded,
-                          color: Colors.white, size: 18),
+
+                      const SizedBox(height: 24),
+
+                      // History
+                      const Text(
+                        'Lịch sử 7 ngày qua',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      ...historyList.map((d) => _HistoryItem(data: d)),
                     ],
                   ),
                 ),
               ),
-
-              const SizedBox(height: 24),
-
-              // History
-              const Text(
-                'Lịch sử 7 ngày qua',
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              ..._historyData.map((d) => _HistoryItem(data: d)),
-            ],
-          ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const QuickHealthEntryScreen(),
+            ),
+          );
+          if (result == true) {
+            _fetchLogs();
+          }
+        },
+        icon: const Icon(Icons.add_rounded, size: 28),
+        label: const Text(
+          'Nhập chỉ số',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
+        backgroundColor: AppTheme.primary,
+        foregroundColor: Colors.white,
       ),
     );
   }
-
-  static const _historyData = [
-    {'date': 'Hôm nay', 'bp': '118/76', 'hr': '72', 'status': 'Tốt'},
-    {'date': 'Hôm qua', 'bp': '122/80', 'hr': '75', 'status': 'Tốt'},
-    {'date': '30/04', 'bp': '130/85', 'hr': '78', 'status': 'Chú ý'},
-    {'date': '29/04', 'bp': '120/78', 'hr': '74', 'status': 'Tốt'},
-    {'date': '28/04', 'bp': '116/74', 'hr': '71', 'status': 'Tốt'},
-  ];
 }
+
 
 class _MetricCard extends StatelessWidget {
   final String label;

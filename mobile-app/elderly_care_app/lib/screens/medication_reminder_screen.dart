@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../services/socket_service.dart';
+import '../services/local_notification_service.dart';
+import '../models/reminder_model.dart';
+import '../models/medication_model.dart';
 
 class MedicationReminderScreen extends StatefulWidget {
-  const MedicationReminderScreen({super.key});
+  final ReminderModel? reminder;
+  final MedicationModel? medication;
+
+  const MedicationReminderScreen({
+    super.key,
+    this.reminder,
+    this.medication,
+  });
 
   @override
   State<MedicationReminderScreen> createState() =>
@@ -43,13 +54,13 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen>
           icon: const Icon(Icons.arrow_back_ios_rounded),
           onPressed: () => Navigator.pop(context),
         ),
-      ),
+      ), // ← đóng AppBar đúng chỗ
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              const Spacer(),
+              const SizedBox(height: 12),
 
               // Animated icon
               if (!_confirmed)
@@ -114,9 +125,11 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen>
                   color: AppTheme.primaryLight,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  '🕐  12:00 — Sau bữa trưa',
-                  style: TextStyle(
+                child: Text(
+                  widget.reminder != null
+                      ? '🕐  ${widget.reminder!.scheduledTime.toLocal().hour.toString().padLeft(2, '0')}:${widget.reminder!.scheduledTime.toLocal().minute.toString().padLeft(2, '0')} — Uống thuốc'
+                      : '🕐  12:00 — Sau bữa trưa',
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppTheme.primary,
@@ -130,8 +143,7 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen>
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  color:
-                      _confirmed ? AppTheme.secondary : AppTheme.textPrimary,
+                  color: _confirmed ? AppTheme.secondary : AppTheme.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -154,26 +166,37 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen>
                 ),
                 child: Column(
                   children: [
-                    _MedRow(icon: Icons.medication_rounded,
-                        label: 'Thuốc', value: 'Metformin 500mg'),
+                    _MedRow(
+                        icon: Icons.medication_rounded,
+                        label: 'Thuốc',
+                        value: widget.medication?.medicationName ?? 'Metformin 500mg'),
                     const Divider(height: 24, color: AppTheme.divider),
-                    _MedRow(icon: Icons.format_list_numbered_rounded,
-                        label: 'Liều lượng', value: '1 viên'),
+                    _MedRow(
+                        icon: Icons.format_list_numbered_rounded,
+                        label: 'Liều lượng',
+                        value: widget.medication?.dosage ?? '1 viên'),
                     const Divider(height: 24, color: AppTheme.divider),
-                    _MedRow(icon: Icons.info_outline_rounded,
-                        label: 'Ghi chú', value: 'Uống với nhiều nước'),
+                    _MedRow(
+                        icon: Icons.info_outline_rounded,
+                        label: 'Ghi chú',
+                        value: (widget.medication?.instructions != null && widget.medication!.instructions!.isNotEmpty)
+                            ? widget.medication!.instructions!
+                            : (widget.medication?.frequency ?? 'Uống sau bữa ăn')),
                   ],
                 ),
               ),
 
-              const Spacer(),
+              const SizedBox(height: 32),
 
               if (!_confirmed) ...[
-                // Done button
                 ElevatedButton.icon(
-                  onPressed: () => setState(() => _confirmed = true),
-                  icon: const Icon(Icons.check_circle_outline_rounded,
-                      size: 24),
+                  onPressed: () {
+                    setState(() => _confirmed = true);
+                    if (widget.reminder != null) {
+                      SocketService.emitMedicationTaken(widget.reminder!.id);
+                    }
+                  },
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 24),
                   label: const Text('Đã uống xong'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.secondary,
@@ -186,7 +209,21 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen>
                 ),
                 const SizedBox(height: 14),
                 OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    // Schedule a local snooze notification for 5 minutes from now
+                    LocalNotificationService.triggerLocalSnooze(
+                      widget.reminder?.id ?? 'manual_snooze_${DateTime.now().millisecondsSinceEpoch}',
+                      'Nhắc nhở uống thuốc',
+                      'Đã đến giờ uống thuốc ${widget.medication?.medicationName ?? ""}! Hãy uống ngay nhé.',
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Sẽ nhắc lại sau 5 phút'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    Navigator.pop(context);
+                  },
                   icon: const Icon(Icons.cancel_outlined, size: 22),
                   label: const Text('Chưa uống được'),
                   style: OutlinedButton.styleFrom(
@@ -205,7 +242,7 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen>
                   child: const Text('Quay lại trang chủ'),
                 ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -218,8 +255,7 @@ class _MedRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _MedRow(
-      {required this.icon, required this.label, required this.value});
+  const _MedRow({required this.icon, required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {

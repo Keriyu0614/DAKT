@@ -17,11 +17,13 @@ public class MedicationsController : ControllerBase
 {
     private readonly MedicationDbContext _context;
     private readonly ILogger<MedicationsController> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
 
-    public MedicationsController(MedicationDbContext context, ILogger<MedicationsController> logger)
+    public MedicationsController(MedicationDbContext context, ILogger<MedicationsController> logger, IHttpClientFactory httpClientFactory)
     {
         _context = context;
         _logger = logger;
+        _httpClientFactory = httpClientFactory;
     }
 
     /// <summary>
@@ -31,10 +33,18 @@ public class MedicationsController : ControllerBase
     /// <response code="200">Returns the list of medications</response>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<MedicationResponseDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<MedicationResponseDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<MedicationResponseDto>>> GetAll([FromQuery] Guid? userId)
     {
-        _logger.LogInformation("Retrieving all medications");
-        var medications = await _context.Medications.ToListAsync();
+        _logger.LogInformation("Retrieving medications. UserId filter: {UserId}", userId);
+        
+        IQueryable<Medication> query = _context.Medications;
+        
+        if (userId.HasValue)
+        {
+            query = query.Where(m => m.UserId == userId.Value);
+        }
+
+        var medications = await query.ToListAsync();
         var response = medications.Select(MedicationResponseDto.FromEntity);
         return Ok(response);
     }
@@ -96,8 +106,48 @@ public class MedicationsController : ControllerBase
         _context.Medications.Add(medication);
         await _context.SaveChangesAsync();
 
+        // Create initial reminders
+        await CreateMedicationReminders(medication);
+
         var response = MedicationResponseDto.FromEntity(medication);
         return CreatedAtAction(nameof(GetById), new { id = medication.Id }, response);
+    }
+
+    private async Task CreateMedicationReminders(Medication medication)
+    {
+        try 
+        {
+            var httpClient = _httpClientFactory.CreateClient();
+            var times = (medication.ScheduledTimes ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries);
+            
+            foreach (var timeStr in times)
+            {
+                if (TimeSpan.TryParse(timeStr.Trim(), out var time))
+                {
+                    // Create reminder for today
+                    var scheduledDateTime = DateTime.Today.Add(time);
+                    
+                    var reminderDto = new
+                    {
+                        userId = medication.UserId,
+                        type = 0, // 0 = Medication
+                        referenceId = medication.Id,
+                        scheduledTime = scheduledDateTime
+                    };
+
+                    var response = await httpClient.PostAsJsonAsync("http://localhost:5005/api/reminders", reminderDto);
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var error = await response.Content.ReadAsStringAsync();
+                        _logger.LogError("Failed to create reminder: {Status}, {Error}", response.StatusCode, error);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error synchronizing reminders for medication {MedicationId}", medication.Id);
+        }
     }
 
     /// <summary>

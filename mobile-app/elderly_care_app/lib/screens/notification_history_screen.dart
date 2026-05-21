@@ -1,24 +1,85 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../widgets/reminder_card.dart';
+import '../services/notification_service.dart';
+import '../models/notification_model.dart';
+import 'package:intl/intl.dart';
 
-class NotificationHistoryScreen extends StatelessWidget {
+class NotificationHistoryScreen extends StatefulWidget {
   const NotificationHistoryScreen({super.key});
 
   @override
+  State<NotificationHistoryScreen> createState() => _NotificationHistoryScreenState();
+}
+
+class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
+  List<NotificationModel> _notifications = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _isLoading = true);
+    final notifications = await NotificationService.getMyNotifications();
+    setState(() {
+      _notifications = notifications;
+      _isLoading = false;
+    });
+  }
+
+  Map<String, List<NotificationModel>> _groupNotificationsByDate() {
+    final Map<String, List<NotificationModel>> grouped = {};
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    for (var notification in _notifications) {
+      final date = DateTime(notification.sentAt.year, notification.sentAt.month, notification.sentAt.day);
+      String label;
+      if (date == today) {
+        label = 'Hôm nay — ${DateFormat('dd/MM/yyyy').format(date)}';
+      } else if (date == yesterday) {
+        label = 'Hôm qua — ${DateFormat('dd/MM/yyyy').format(date)}';
+      } else {
+        label = DateFormat('dd/MM/yyyy').format(date);
+      }
+
+      if (!grouped.containsKey(label)) {
+        grouped[label] = [];
+      }
+      grouped[label]!.add(notification);
+    }
+    return grouped;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final groupedNotifications = _groupNotificationsByDate();
+
     return Scaffold(
       backgroundColor: AppTheme.surface,
       appBar: AppBar(
         title: const Text('Lịch sử thông báo'),
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_rounded),
+          onPressed: () => Navigator.pop(context),
+        ),
         actions: [
           TextButton(
-            onPressed: () {},
+            onPressed: () async {
+              final success = await NotificationService.markAllAsRead();
+              if (success) {
+                _loadNotifications();
+              }
+            },
             child: const Text(
-              'Xoá tất cả',
+              'Đã đọc',
               style: TextStyle(
-                color: AppTheme.danger,
+                color: AppTheme.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -26,97 +87,45 @@ class NotificationHistoryScreen extends StatelessWidget {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            _DaySection(
-              label: 'Hôm nay — 02/05/2025',
-              items: [
-                ReminderCard(
-                  icon: Icons.medication_rounded,
-                  iconColor: AppTheme.secondary,
-                  iconBg: AppTheme.secondaryLight,
-                  title: 'Amlodipine 5mg',
-                  subtitle: 'Uống sau bữa sáng',
-                  time: '07:30',
-                  status: ReminderStatus.done,
-                ),
-                ReminderCard(
-                  icon: Icons.medication_rounded,
-                  iconColor: AppTheme.warning,
-                  iconBg: AppTheme.warningLight,
-                  title: 'Metformin 500mg',
-                  subtitle: 'Uống sau bữa trưa',
-                  time: '12:00',
-                  status: ReminderStatus.pending,
-                ),
-                ReminderCard(
-                  icon: Icons.local_hospital_rounded,
-                  iconColor: AppTheme.primary,
-                  iconBg: AppTheme.primaryLight,
-                  title: 'Nhắc tái khám ngày mai',
-                  subtitle: 'BV Chợ Rẫy — BS. Nguyễn Văn An',
-                  time: '09:00',
-                  status: ReminderStatus.upcoming,
-                ),
-              ],
-            ),
-            _DaySection(
-              label: 'Hôm qua — 01/05/2025',
-              items: [
-                ReminderCard(
-                  icon: Icons.medication_rounded,
-                  iconColor: AppTheme.secondary,
-                  iconBg: AppTheme.secondaryLight,
-                  title: 'Amlodipine 5mg',
-                  subtitle: 'Uống sau bữa sáng',
-                  time: '07:30',
-                  status: ReminderStatus.done,
-                ),
-                ReminderCard(
-                  icon: Icons.medication_rounded,
-                  iconColor: AppTheme.danger,
-                  iconBg: AppTheme.dangerLight,
-                  title: 'Metformin 500mg',
-                  subtitle: 'Uống sau bữa trưa',
-                  time: '12:00',
-                  status: ReminderStatus.missed,
-                ),
-                ReminderCard(
-                  icon: Icons.medication_rounded,
-                  iconColor: AppTheme.secondary,
-                  iconBg: AppTheme.secondaryLight,
-                  title: 'Amlodipine 5mg',
-                  subtitle: 'Uống sau bữa tối',
-                  time: '19:00',
-                  status: ReminderStatus.done,
-                ),
-              ],
-            ),
-            _DaySection(
-              label: '30/04/2025',
-              items: [
-                ReminderCard(
-                  icon: Icons.medication_rounded,
-                  iconColor: AppTheme.secondary,
-                  iconBg: AppTheme.secondaryLight,
-                  title: 'Amlodipine 5mg',
-                  subtitle: 'Uống sau bữa sáng',
-                  time: '07:30',
-                  status: ReminderStatus.done,
-                ),
-                ReminderCard(
-                  icon: Icons.local_hospital_rounded,
-                  iconColor: AppTheme.secondary,
-                  iconBg: AppTheme.secondaryLight,
-                  title: 'Tái khám tiêu hoá',
-                  subtitle: 'BV 115 — BS. Trần Thị Mai',
-                  time: '10:00',
-                  status: ReminderStatus.done,
-                ),
-              ],
-            ),
-          ],
+        child: RefreshIndicator(
+          onRefresh: _loadNotifications,
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _notifications.isEmpty
+                  ? const Center(child: Text('Không có thông báo nào'))
+                  : ListView(
+                      padding: const EdgeInsets.all(20),
+                      children: groupedNotifications.entries.map((entry) {
+                        return _DaySection(
+                          label: entry.key,
+                          items: entry.value.map((notification) {
+                            return ReminderCard(
+                              icon: notification.title.contains('thuốc') 
+                                ? Icons.medication_rounded 
+                                : Icons.calendar_month_rounded,
+                              iconColor: notification.priority == 'High' || notification.priority == 'Critical'
+                                ? AppTheme.danger
+                                : AppTheme.primary,
+                              iconBg: notification.priority == 'High' || notification.priority == 'Critical'
+                                ? AppTheme.dangerLight
+                                : AppTheme.primaryLight,
+                              title: notification.title,
+                              subtitle: notification.message,
+                              time: DateFormat('HH:mm').format(notification.sentAt),
+                              status: notification.status == 'Read' || notification.status == 'Acknowledged'
+                                ? ReminderStatus.done
+                                : ReminderStatus.pending,
+                              onTap: () async {
+                                if (notification.status != 'Read' && notification.status != 'Acknowledged') {
+                                  await NotificationService.markAsRead(notification.id);
+                                  _loadNotifications();
+                                }
+                              },
+                            );
+                          }).toList(),
+                        );
+                      }).toList(),
+                    ),
         ),
       ),
     );

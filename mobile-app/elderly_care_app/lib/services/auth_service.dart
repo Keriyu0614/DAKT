@@ -71,4 +71,38 @@ class AuthService {
     currentUser = null;
     ApiService.setToken('');
   }
+
+  static Future<String?> updateAvatar(String filePath) async {
+    try {
+      if (currentUser == null) return null;
+
+      final response = await ApiService.uploadFile(
+        'auth/avatar/${currentUser!.userId}',
+        filePath,
+        'file',
+      );
+
+      if (response.statusCode == 200) {
+        final respStr = await response.stream.bytesToString();
+        final data = jsonDecode(respStr);
+        final newAvatarUrl = data['avatarUrl'];
+        
+        // Update local user model
+        currentUser = UserModel(
+          userId: currentUser!.userId,
+          name: currentUser!.name,
+          email: currentUser!.email,
+          role: currentUser!.role,
+          token: currentUser!.token,
+          avatarUrl: newAvatarUrl,
+        );
+        
+        return newAvatarUrl;
+      }
+      return null;
+    } catch (e) {
+      print('Update avatar error: $e');
+      return null;
+    }
+  }
 }

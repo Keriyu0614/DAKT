@@ -1,229 +1,183 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
+import authApi from "../../api/auth.api";
 import {
     User as UserIcon,
     ShieldCheck,
-    Globe,
-    Lock,
     LogOut,
     CheckCircle2,
-    Clock,
-    ChevronRight
+    Camera,
+    Mail,
+    Loader2
 } from "lucide-react";
 import "./ProfilePage.css";
 
 export const ProfilePage = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, updateUser } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState(user?.name || "");
-    const [language, setLanguage] = useState("English");
     const [showSavedMsg, setShowSavedMsg] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     if (!user) {
         return (
             <div className="profile-container">
-                <div className="loading-card">Loading profile identity...</div>
+                <div className="loading-card">Đang tải hồ sơ...</div>
             </div>
         );
     }
 
-    const isElderly = String(user.role) === "0";
+    const isCaregiver = String(user.role) === "Caregiver" || String(user.role) === "1";
 
-    const handleSave = () => {
-        // In a real app, this would call an API
-        // For now, we update local state and show a confirmation
-        setShowSavedMsg(true);
-        setIsEditing(false);
-        setTimeout(() => setShowSavedMsg(false), 3000);
+    const handleSave = async () => {
+        if (!user) return;
+        setIsSaving(true);
+        try {
+            const response = await authApi.updateProfile(user.id, { name });
+            updateUser({ name: response.data.name });
+            setShowSavedMsg(true);
+            setIsEditing(false);
+            setTimeout(() => setShowSavedMsg(false), 3000);
+        } catch (error) {
+            console.error("Lỗi cập nhật hồ sơ", error);
+            alert("Không thể cập nhật hồ sơ. Vui lòng thử lại.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleAvatarClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !user) return;
+
+        setIsUploading(true);
+        try {
+            const response = await authApi.uploadAvatar(user.id, file);
+            // The response returns the partial path, we might need to prepend base URL if needed
+            // But let's assume the backend returns a usable URL or the frontend handles it
+            updateUser({ avatarUrl: response.data.avatarUrl });
+        } catch (error) {
+            console.error("Lỗi tải lên ảnh đại diện", error);
+            alert("Không thể tải lên ảnh đại diện. Vui lòng thử lại.");
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
+    const getAvatarContent = () => {
+        if (isUploading) return <Loader2 className="animate-spin" size={24} />;
+        if (user.avatarUrl) {
+            // Assuming the avatarUrl is a relative path like /avatars/filename.jpg
+            // In a real app, you'd use a full URL or a proxy
+            const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+            return <img src={`${baseUrl}${user.avatarUrl}`} alt={user.name} className="profile-img" />;
+        }
+        return user.name.charAt(0).toUpperCase();
     };
 
     return (
         <div className="profile-container">
-            {/* 1️⃣ Profile Header (Identity Anchor) */}
+            {showSavedMsg && (
+                <div className="saved-msg">
+                    <CheckCircle2 size={18} /> Đã lưu thay đổi thành công!
+                </div>
+            )}
+
             <div className="profile-card">
                 <div className="profile-header">
-                    <div className="profile-avatar-large">
-                        {user.name.charAt(0).toUpperCase()}
+                    <div className="profile-avatar-wrapper" onClick={handleAvatarClick}>
+                        <div className="profile-avatar-large">
+                            {getAvatarContent()}
+                        </div>
+                        <div className="avatar-edit-overlay">
+                            <Camera size={20} />
+                        </div>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            style={{ display: 'none' }} 
+                            accept="image/*"
+                            onChange={handleFileChange}
+                        />
                     </div>
-                    <h1 className="profile-name-title">{name}</h1>
-                    <div className={`role-badge-large ${isElderly ? 'role-badge-elderly' : 'role-badge-caregiver'}`}>
+                    <h1 className="profile-name-title">{user.name}</h1>
+                    <div className="role-badge-large role-badge-caregiver">
                         <ShieldCheck size={16} />
-                        {isElderly ? "Elderly User" : "Caregiver"}
+                        {isCaregiver ? "Người chăm sóc" : "Người dùng"}
                     </div>
                 </div>
 
-                {/* 2️⃣ Personal Information Section */}
                 <section className="profile-section">
                     <div className="section-title">
                         <UserIcon size={20} className="section-icon" />
-                        <h2>Personal Information</h2>
+                        <h2>Thông tin cá nhân</h2>
                     </div>
 
                     <div className="info-grid">
                         <div className="info-item">
-                            <label className="info-label">Full Name</label>
+                            <label className="info-label">Họ và Tên</label>
                             {isEditing ? (
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="info-value"
+                                    autoFocus
                                 />
                             ) : (
-                                <div className="info-value editable" onClick={() => setIsEditing(true)}>
-                                    {name}
+                                <div className="info-value read-only">
+                                    {user.name}
                                 </div>
                             )}
                         </div>
 
                         <div className="info-item">
-                            <label className="info-label">Email Address</label>
-                            <div className="info-value read-only">
+                            <label className="info-label">Địa chỉ Email</label>
+                            <div className="info-value read-only" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Mail size={14} color="#94a3b8" />
                                 {user.email}
                             </div>
                         </div>
-
-                        <div className="info-item">
-                            <label className="info-label">Preferred Language</label>
-                            <select
-                                className="info-value"
-                                value={language}
-                                onChange={(e) => setLanguage(e.target.value)}
-                            >
-                                <option value="English">English</option>
-                                <option value="Tiếng Việt">Tiếng Việt</option>
-                            </select>
-                        </div>
                     </div>
 
-                    {isEditing && (
-                        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end' }}>
-                            <button className="cancel-btn" onClick={() => setIsEditing(false)}>Cancel</button>
-                            <button className="save-btn" onClick={handleSave}>Save Changes</button>
-                        </div>
-                    )}
-
-                    {showSavedMsg && (
-                        <div style={{ marginTop: '10px', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
-                            <CheckCircle2 size={16} /> Changes saved successfully
-                        </div>
-                    )}
-                </section>
-
-                {/* 3️⃣ Role & Permissions Overview (Read-only) */}
-                <section className="profile-section">
-                    <div className="section-title">
-                        <ShieldCheck size={20} className="section-icon" />
-                        <h2>Role & Permissions</h2>
-                    </div>
-
-                    <div className="permissions-list">
-                        <p style={{ marginBottom: '15px', color: '#2c3e50', fontWeight: 600 }}>
-                            Your account has the <span style={{ color: '#3498db' }}>{isElderly ? "Elderly" : "Caregiver"}</span> role.
-                        </p>
-
-                        {isElderly ? (
-                            <div className="permission-grid">
-                                <div className="permission-entry">
-                                    <CheckCircle2 size={16} color="#16a34a" />
-                                    <span>Receive reminders for medications and appointments.</span>
-                                </div>
-                                <div className="permission-entry">
-                                    <CheckCircle2 size={16} color="#16a34a" />
-                                    <span>Confirm medication intake and appointment attendance.</span>
-                                </div>
-                                <div className="permission-entry">
-                                    <CheckCircle2 size={16} color="#16a34a" />
-                                    <span>View personal health tracking and logs.</span>
-                                </div>
-                            </div>
+                    <div className="profile-actions">
+                        {isEditing ? (
+                            <>
+                                <button className="btn-cancel" onClick={() => { setIsEditing(false); setName(user.name); }}>
+                                    Hủy
+                                </button>
+                                <button className="btn-save" onClick={handleSave} disabled={isSaving}>
+                                    {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+                                </button>
+                            </>
                         ) : (
-                            <div className="permission-grid">
-                                <div className="permission-entry">
-                                    <CheckCircle2 size={16} color="#16a34a" />
-                                    <span>Manage medications, schedules, and appointments.</span>
-                                </div>
-                                <div className="permission-entry">
-                                    <CheckCircle2 size={16} color="#16a34a" />
-                                    <span>Monitor health data and receive missed reminder alerts.</span>
-                                </div>
-                                <div className="permission-entry">
-                                    <CheckCircle2 size={16} color="#16a34a" />
-                                    <span>Access system-wide reports and logs.</span>
-                                </div>
-                            </div>
+                            <button className="btn-edit" onClick={() => setIsEditing(true)}>
+                                Chỉnh sửa Hồ sơ
+                            </button>
                         )}
                     </div>
                 </section>
 
-                {/* 4️⃣ Preferences Section (Non-Identity) */}
-                <section className="profile-section">
-                    <div className="section-title">
-                        <Globe size={20} className="section-icon" />
-                        <h2>User Preferences</h2>
+                <section className="profile-section" style={{ borderBottom: 'none' }}>
+                    <div className="section-title danger">
+                        <LogOut size={20} className="section-icon danger" />
+                        <h2>Quản lý Tài khoản</h2>
                     </div>
-
-                    <div className="preference-grid">
-                        <div className="preference-card">
-                            <div className="preference-info">
-                                <span className="preference-label">Notifications</span>
-                                <span className="preference-desc">Enable notifications for upcoming tasks</span>
-                            </div>
-                            <input type="checkbox" defaultChecked />
-                        </div>
-
-                        <div className="preference-card">
-                            <div className="preference-info">
-                                <span className="preference-label">High Contrast Mode</span>
-                                <span className="preference-desc">Increase visibility of text and elements</span>
-                            </div>
-                            <input type="checkbox" />
-                        </div>
-
-                        <div className="preference-card">
-                            <div className="preference-info">
-                                <span className="preference-label">Large Text</span>
-                                <span className="preference-desc">Increase font size across all pages</span>
-                            </div>
-                            <input type="checkbox" />
-                        </div>
-                    </div>
-                </section>
-
-                {/* 5️⃣ Security Awareness Section */}
-                <section className="profile-section">
-                    <div className="section-title">
-                        <Lock size={20} className="section-icon" />
-                        <h2>Security</h2>
-                    </div>
-
-                    <div className="preference-grid">
-                        <div className="preference-card">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <Clock size={20} color="#7f8c8d" />
-                                <div className="preference-info">
-                                    <span className="preference-label">Last Login</span>
-                                    <span className="preference-desc">{new Date().toLocaleString()} (Current Session)</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="preference-card" style={{ cursor: 'pointer' }} onClick={() => logout()}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <LogOut size={20} color="#e74c3c" />
-                                <div className="preference-info">
-                                    <span className="preference-label" style={{ color: '#e74c3c' }}>Sign Out</span>
-                                    <span className="preference-desc">Securely exit your session</span>
-                                </div>
-                            </div>
-                            <ChevronRight size={16} color="#7f8c8d" />
-                        </div>
-                    </div>
+                    
+                    <button className="btn-danger" onClick={() => logout()}>
+                        <LogOut size={18} /> Đăng xuất
+                    </button>
                 </section>
             </div>
 
             <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '13px', paddingBottom: '20px' }}>
-                System Identity ID: {user.id} • Version 1.0.4
+                ID Người dùng: {user.id} • Phiên bản 1.1.0
             </div>
         </div>
     );

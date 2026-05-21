@@ -58,7 +58,7 @@ export const NotificationsPage = () => {
             setError('');
         } catch (err) {
             console.error(err);
-            if (!isSilent) setError('Unable to load notifications. Please check your connection.');
+            if (!isSilent) setError('Không thể tải thông báo. Vui lòng kiểm tra kết nối.');
         } finally {
             if (!isSilent) setLoading(false);
         }
@@ -115,9 +115,9 @@ export const NotificationsPage = () => {
                         : n
                 )
             );
-            toast.success('Marked as read');
+            toast.success('Đã đánh dấu là đã đọc');
         } catch (err) {
-            toast.error('Failed to mark as read');
+            toast.error('Lỗi khi đánh dấu là đã đọc');
             console.error(err);
         } finally {
             setActioningId(null);
@@ -137,9 +137,9 @@ export const NotificationsPage = () => {
                         : n
                 )
             );
-            toast.success('Acknowledged');
+            toast.success('Đã xác nhận');
         } catch (err) {
-            toast.error('Failed to acknowledge');
+            toast.error('Lỗi khi xác nhận');
             console.error(err);
         } finally {
             setActioningId(null);
@@ -152,14 +152,14 @@ export const NotificationsPage = () => {
         // Confirmation for multiple retries
         if (notif.retryCount >= 3) {
             const confirmed = window.confirm(
-                `⚠️ Retry Delivery?\n\nThis notification has already failed ${notif.retryCount} times.\nAre you sure you want to retry?`
+                `⚠️ Thử lại gửi?\n\nThông báo này đã thất bại ${notif.retryCount} lần.\nBạn có chắc chắn muốn thử lại không?`
             );
             if (!confirmed) return;
         }
 
         setActioningId(notif.id);
         try {
-            toast.info('Retrying delivery...');
+            toast.info('Đang thử lại...');
             await notificationApi.retryDelivery(notif.id);
             setNotifications(prev =>
                 prev.map(n =>
@@ -173,8 +173,8 @@ export const NotificationsPage = () => {
                 fetchNotifications();
             }, 2000);
         } catch (err: any) {
-            const errorMsg = err?.response?.data?.message || 'Retry failed';
-            toast.error(`Delivery failed: ${errorMsg}`);
+            const errorMsg = err?.response?.data?.message || 'Thử lại thất bại';
+            toast.error(`Gửi thất bại: ${errorMsg}`);
             console.error(err);
         } finally {
             setActioningId(null);
@@ -187,7 +187,7 @@ export const NotificationsPage = () => {
             const response = await notificationApi.getNotificationDetail(notif.id);
             setDetailModal(response.data);
         } catch (err) {
-            toast.error('Failed to load notification details');
+            toast.error('Lỗi khi tải chi tiết thông báo');
             console.error(err);
         } finally {
             setLoadingDetail(false);
@@ -229,7 +229,7 @@ export const NotificationsPage = () => {
     if (loading) {
         return (
             <div className="notifications-container">
-                <div className="loading-view">Loading Notifications...</div>
+                <div className="loading-view">Đang tải thông báo...</div>
             </div>
         );
     }
@@ -240,8 +240,8 @@ export const NotificationsPage = () => {
             <header className="notifications-header">
                 <div className="header-content">
                     <div>
-                        <h1><Bell size={32} /> Notifications</h1>
-                        <p>System-delivered alerts from your reminders and care events</p>
+                        <h1><Bell size={32} /> Thông Báo</h1>
+                        <p>Cảnh báo được gửi từ hệ thống về nhắc nhở và sự kiện chăm sóc</p>
                     </div>
                 </div>
             </header>
@@ -251,21 +251,21 @@ export const NotificationsPage = () => {
             <div className="notifications-content">
                 {/* Today */}
                 <NotificationGroup
-                    title="Today"
+                    title="Hôm nay"
                     notifications={groupedNotifications.today}
                     icon={<Bell size={28} />}
                 />
 
                 {/* Yesterday */}
                 <NotificationGroup
-                    title="Yesterday"
+                    title="Hôm qua"
                     notifications={groupedNotifications.yesterday}
                     icon={<ClockIcon size={28} />}
                 />
 
                 {/* Past 7 Days */}
                 <NotificationGroup
-                    title="Past 7 Days"
+                    title="7 ngày qua"
                     notifications={groupedNotifications.past7Days}
                     icon={<ClockIcon size={28} />}
                 />
@@ -277,7 +277,7 @@ export const NotificationsPage = () => {
                             className="section-title collapsible"
                             onClick={() => setIsPastCollapsed(!isPastCollapsed)}
                         >
-                            <CheckCircle2 size={28} /> Older ({groupedNotifications.older.length})
+                            <CheckCircle2 size={28} /> Cũ hơn ({groupedNotifications.older.length})
                             {isPastCollapsed ? <ChevronDown size={24} /> : <ChevronUp size={24} />}
                         </h2>
                         {!isPastCollapsed && (
@@ -303,8 +303,8 @@ export const NotificationsPage = () => {
                 {notifications.length === 0 && (
                     <div className="empty-state">
                         <Bell size={64} style={{ opacity: 0.2 }} />
-                        <h3>No notifications yet</h3>
-                        <p>Notifications will appear here when your reminders are delivered</p>
+                        <h3>Chưa có thông báo nào</h3>
+                        <p>Thông báo sẽ xuất hiện ở đây khi nhắc nhở được gửi</p>
                     </div>
                 )}
             </div>

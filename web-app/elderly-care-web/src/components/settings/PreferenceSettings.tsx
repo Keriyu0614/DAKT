@@ -31,60 +31,47 @@ const PreferenceSettings = ({
 }: PreferenceSettingsProps) => {
     return (
         <>
-            {/* Language & Display */}
+            {/* Giao diện */}
             <section className="settings-section">
                 <div className="section-header">
                     <div className="section-icon"><Globe size={20} /></div>
                     <div className="section-title-group">
-                        <h2>Language & Display</h2>
-                        <p>Customize your viewing experience</p>
+                        <h2>Giao Diện</h2>
+                        <p>Tùy chỉnh trải nghiệm hiển thị của bạn</p>
                     </div>
                 </div>
                 <div className="section-body">
                     <div className="setting-item">
                         <div>
-                            <div className="setting-label">Language</div>
-                        </div>
-                        <select
-                            className="setting-select"
-                            value={display.language}
-                            onChange={(e) => onUpdateDisplay('language', e.target.value)}
-                        >
-                            <option value="en">English (US)</option>
-                            <option value="vi">Tiếng Việt</option>
-                        </select>
-                    </div>
-                    <div className="setting-item">
-                        <div>
-                            <div className="setting-label">Font Size</div>
+                            <div className="setting-label">Cỡ Chữ</div>
                         </div>
                         <select
                             className="setting-select"
                             value={display.fontSize}
                             onChange={(e) => onUpdateDisplay('fontSize', e.target.value)}
                         >
-                            <option value="normal">Normal</option>
-                            <option value="large">Large</option>
-                            <option value="xl">Extra Large</option>
+                            <option value="normal">Bình thường</option>
+                            <option value="large">Lớn</option>
+                            <option value="xl">Rất lớn</option>
                         </select>
                     </div>
                 </div>
             </section>
 
-            {/* Accessibility */}
+            {/* Khả Năng Tiếp Cận */}
             <section className="settings-section">
                 <div className="section-header">
                     <div className="section-icon"><Eye size={20} /></div>
                     <div className="section-title-group">
-                        <h2>Accessibility</h2>
-                        <p>Tools for easier navigation</p>
+                        <h2>Khả Năng Tiếp Cận</h2>
+                        <p>Công cụ hỗ trợ điều hướng dễ dàng hơn</p>
                     </div>
                 </div>
                 <div className="section-body">
                     <div className="setting-item">
                         <div>
-                            <div className="setting-label">High Contrast Mode</div>
-                            <div className="setting-description">Increases difference between text and background</div>
+                            <div className="setting-label">Chế Độ Tương Phản Cao</div>
+                            <div className="setting-description">Tăng sự khác biệt giữa văn bản và nền</div>
                         </div>
                         <label className="switch">
                             <input
@@ -97,8 +84,8 @@ const PreferenceSettings = ({
                     </div>
                     <div className="setting-item">
                         <div>
-                            <div className="setting-label">Larger Buttons</div>
-                            <div className="setting-description">Make clickable areas bigger</div>
+                            <div className="setting-label">Nút Lớn Hơn</div>
+                            <div className="setting-description">Mở rộng vùng có thể nhấn</div>
                         </div>
                         <label className="switch">
                             <input
@@ -111,8 +98,8 @@ const PreferenceSettings = ({
                     </div>
                     <div className="setting-item">
                         <div>
-                            <div className="setting-label">Reduced Motion</div>
-                            <div className="setting-description">Minimize animations across the app</div>
+                            <div className="setting-label">Giảm Hiệu Ứng</div>
+                            <div className="setting-description">Tối thiểu hoá hoạt ảnh trong ứng dụng</div>
                         </div>
                         <label className="switch">
                             <input
@@ -126,29 +113,29 @@ const PreferenceSettings = ({
                 </div>
             </section>
 
-            {/* System Preferences */}
+            {/* Tùy Chỉnh Hệ Thống */}
             <section className="settings-section">
                 <div className="section-header">
                     <div className="section-icon"><Monitor size={20} /></div>
                     <div className="section-title-group">
-                        <h2>System Preferences</h2>
-                        <p>General behavior settings</p>
+                        <h2>Tùy Chỉnh Hệ Thống</h2>
+                        <p>Cài đặt hành vi chung của ứng dụng</p>
                     </div>
                 </div>
                 <div className="section-body">
                     <div className="setting-item">
                         <div>
-                            <div className="setting-label">Default Landing Page</div>
-                            <div className="setting-description">Page to show after login</div>
+                            <div className="setting-label">Trang Mặc Định Sau Đăng Nhập</div>
+                            <div className="setting-description">Trang hiển thị sau khi đăng nhập</div>
                         </div>
                         <select
                             className="setting-select"
                             value={system.defaultLanding}
                             onChange={(e) => onUpdateSystem('defaultLanding', e.target.value)}
                         >
-                            <option value="dashboard">Dashboard</option>
-                            <option value="appointments">Appointments</option>
-                            <option value="medications">Medications</option>
+                            <option value="dashboard">Trang chủ</option>
+                            <option value="appointments">Lịch khám</option>
+                            <option value="medications">Thuốc</option>
                         </select>
                     </div>
                 </div>
