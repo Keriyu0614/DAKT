@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'package:vibration/vibration.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../main.dart';
-import 'appointment_detail_screen.dart';
+import '../models/appointment_model.dart';
+import '../models/reminder_model.dart';
+import '../services/socket_service.dart';
 
 class AppointmentReminderScreen extends StatefulWidget {
-  const AppointmentReminderScreen({super.key});
+  final ReminderModel reminder;
+  final AppointmentModel appointment;
+
+  const AppointmentReminderScreen({
+    super.key,
+    required this.reminder,
+    required this.appointment,
+  });
 
   @override
   State<AppointmentReminderScreen> createState() =>
@@ -26,12 +38,41 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
     _pulseAnim = Tween<double>(begin: 1.0, end: 1.07).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _startAlarm();
+  }
+
+  Future<void> _startAlarm() async {
+    if (widget.reminder != null) {
+      final notifyId = widget.reminder.id.hashCode + 1000000;
+      await FlutterLocalNotificationsPlugin().cancel(notifyId);
+    }
+
+    FlutterRingtonePlayer().playAlarm(looping: true);
+
+    final bool? hasVibrator = await Vibration.hasVibrator();
+    if (hasVibrator == true) {
+      Vibration.vibrate(pattern: [1000, 1000], repeat: 0);
+    }
   }
 
   @override
   void dispose() {
+    _stopAlarm();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  void _stopAlarm() {
+    FlutterRingtonePlayer().stop();
+    Vibration.cancel();
+  }
+
+  String _formatAppointmentDate(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final ampm = local.hour >= 12 ? 'CH' : 'SA';
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} • ${hour.toString().padLeft(2, '0')}:$minute $ampm';
   }
 
   @override
@@ -52,7 +93,6 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
             children: [
               const SizedBox(height: 12),
 
-              // Animated icon
               ScaleTransition(
                 scale: _acknowledged
                     ? const AlwaysStoppedAnimation(1.0)
@@ -87,7 +127,6 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
 
               const SizedBox(height: 36),
 
-              // Time badge
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -95,9 +134,9 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
                   color: AppTheme.secondaryLight,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  '📅  Ngày mai — 09:00 SA',
-                  style: TextStyle(
+                child: Text(
+                  '📅 ${_formatAppointmentDate(widget.appointment.appointmentDate)}',
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppTheme.secondary,
@@ -111,8 +150,7 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  color:
-                      _acknowledged ? AppTheme.secondary : AppTheme.textPrimary,
+                  color: _acknowledged ? AppTheme.secondary : AppTheme.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -129,7 +167,6 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
                 ),
               const SizedBox(height: 24),
 
-              // Appointment details
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -149,33 +186,47 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
                 child: Column(
                   children: [
                     _ApptRow(
-                        icon: Icons.local_hospital_rounded,
-                        label: 'Bệnh viện',
-                        value: 'BV Chợ Rẫy'),
+                      icon: Icons.person_rounded,
+                      label: 'Bác sĩ',
+                      value: widget.appointment.doctorName,
+                    ),
                     const Divider(height: 24, color: AppTheme.divider),
                     _ApptRow(
-                        icon: Icons.person_rounded,
-                        label: 'Bác sĩ',
-                        value: 'BS. Nguyễn Văn An'),
+                      icon: Icons.local_hospital_rounded,
+                      label: 'Địa điểm',
+                      value: widget.appointment.location,
+                    ),
                     const Divider(height: 24, color: AppTheme.divider),
                     _ApptRow(
-                        icon: Icons.medical_services_rounded,
-                        label: 'Khoa',
-                        value: 'Tim mạch'),
+                      icon: Icons.access_time_rounded,
+                      label: 'Giờ khám',
+                      value: _formatAppointmentDate(widget.appointment.appointmentDate),
+                    ),
                     const Divider(height: 24, color: AppTheme.divider),
                     _ApptRow(
-                        icon: Icons.access_time_rounded,
-                        label: 'Giờ khám',
-                        value: '09:00 SA'),
+                      icon: Icons.note_rounded,
+                      label: 'Ghi chú',
+                      value: widget.appointment.notes?.isNotEmpty == true
+                          ? widget.appointment.notes!
+                          : 'Không có ghi chú',
+                    ),
                   ],
                 ),
               ),
 
               const SizedBox(height: 32),
 
-              if (!_acknowledged) ...[
+              if (!_acknowledged)
                 ElevatedButton.icon(
-                  onPressed: () => setState(() => _acknowledged = true),
+                  onPressed: () {
+                    _stopAlarm();
+                    setState(() => _acknowledged = true);
+                    SocketService.emitAppointmentDone(
+                      widget.appointment.id,
+                      doctorName: widget.appointment.doctorName,
+                      userId: widget.appointment.userId,
+                    );
+                  },
                   icon: const Icon(Icons.directions_walk_rounded, size: 24),
                   label: const Text('Tôi đang trên đường'),
                   style: ElevatedButton.styleFrom(
@@ -186,27 +237,8 @@ class _AppointmentReminderScreenState extends State<AppointmentReminderScreen>
                     textStyle: const TextStyle(
                         fontSize: 19, fontWeight: FontWeight.w700),
                   ),
-                ),
-                const SizedBox(height: 14),
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const AppointmentDetailScreen()),
-                  ),
-                  icon: const Icon(Icons.info_outline_rounded, size: 22),
-                  label: const Text('Xem chi tiết lịch khám'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                    side: const BorderSide(color: AppTheme.primary),
-                    minimumSize: const Size(double.infinity, 64),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18)),
-                    textStyle: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ] else
+                )
+              else
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Quay lại trang chủ'),

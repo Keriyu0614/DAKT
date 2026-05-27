@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AppLayout from "../components/layout/AppLayout";
 import AuthGuard from "./AuthGuard";
+import ManagedElderlyGuard from "./ManagedElderlyGuard";
 
 import { HomePage } from "../pages/home/HomePage";
 import { LoginPage } from "../pages/auth/LoginPage";
@@ -10,12 +11,12 @@ import { AppointmentsPage } from "../pages/appointments/AppointmentsPage";
 import { MedicationsPage } from "../pages/medications/MedicationsPage";
 import { HealthPage } from "../pages/health/HealthPage";
 import { HealthSchedulePage } from "../pages/health/HealthSchedulePage";
-import { RemindersPage } from "../pages/reminders/RemindersPage";
+
 import { NotificationsPage } from "../pages/notifications/NotificationsPage";
-import { ReportPage } from "../pages/report/ReportPage";
 import { ProfilePage } from "../pages/profile/ProfilePage";
 import { SettingsPage } from "../pages/settings/SettingsPage";
 import { ElderlyPage } from "../pages/userelderly/ElderlyPage";
+// import { SeedDataPage } from "../pages/dev/SeedDataPage"; // Commented out - using backend seed instead
 
 export default function AppRoutes() {
   return (
@@ -25,6 +26,9 @@ export default function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        
+        {/* Dev Tools - Commented out, using backend seed instead */}
+        {/* <Route path="/dev/seed" element={<SeedDataPage />} /> */}
 
         {/* Protected */}
         <Route element={<AuthGuard />}>
@@ -32,11 +36,11 @@ export default function AppRoutes() {
             <Route index element={<DashboardPage />} />
             <Route path="appointments" element={<AppointmentsPage />} />
             <Route path="medications" element={<MedicationsPage />} />
-            <Route path="health" element={<HealthPage />} />
-            <Route path="health-schedule" element={<HealthSchedulePage />} />
-            <Route path="reminders" element={<RemindersPage />} />
-            <Route path="notifications" element={<NotificationsPage />} />
-            <Route path="reports" element={<ReportPage />} />
+            <Route element={<ManagedElderlyGuard />}>
+              <Route path="health" element={<HealthPage />} />
+              <Route path="health-schedule" element={<HealthSchedulePage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+            </Route>
             <Route path="profile" element={<ProfilePage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="elderly" element={<ElderlyPage />} />

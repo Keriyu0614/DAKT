@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Activity, Heart, X, Save, Clock, Calendar, FileText, CheckCircle2 } from 'lucide-react';
+import { Heart, X, Save, Clock, Calendar, FileText, CheckCircle2 } from 'lucide-react';
 import { healthApi, type HealthLog, type CreateHealthLogPayload } from '../../api/health.api';
+import { socketService } from '../../services/socket.service';
 
 interface HealthEntryFormProps {
     userId: string;
@@ -10,13 +11,12 @@ interface HealthEntryFormProps {
 }
 
 const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntryFormProps) => {
-    const [formData, setFormData] = useState<Partial<CreateHealthLogPayload>>({
+    const [formData, setFormData] = useState({
         bloodPressure: '',
-        heartRate: undefined,
-        weight: undefined,
+        heartRate: '',
+        weight: '',
         note: ''
     });
-    const [measurementType, setMeasurementType] = useState<'vitals' | 'weight'>('vitals');
     const [timestamp, setTimestamp] = useState(new Date().toISOString());
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isDirty, setIsDirty] = useState(false);
@@ -29,25 +29,16 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
             const hr = log.heartRate !== undefined ? log.heartRate : (log as any).HeartRate;
             const w = log.weight !== undefined ? log.weight : (log as any).Weight;
             const bp = log.bloodPressure || (log as any).BloodPressure;
-
             setFormData({
-                bloodPressure: bp || '',
-                heartRate: hr,
-                weight: w,
+                bloodPressure: (bp && bp !== '-') ? bp : '',
+                heartRate: hr !== undefined && hr !== null ? String(hr) : '',
+                weight: w !== undefined && w !== null ? String(w) : '',
                 note: log.note || ''
             });
             setTimestamp(log.date);
-            if ((bp && bp !== '-') || hr !== undefined) setMeasurementType('vitals');
-            else if (w !== undefined) setMeasurementType('weight');
         } else {
-            setFormData({
-                bloodPressure: '',
-                heartRate: undefined,
-                weight: undefined,
-                note: ''
-            });
+            setFormData({ bloodPressure: '', heartRate: '', weight: '', note: '' });
             setTimestamp(new Date().toISOString());
-            setMeasurementType('vitals');
         }
         setErrors({});
         setIsDirty(false);
@@ -58,64 +49,41 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
         resetForm(editingLog);
     }, [editingLog, resetForm]);
 
-    const handleInputChange = (field: keyof CreateHealthLogPayload, value: any) => {
+    const handleInputChange = (field: string, value: string) => {
         setFormData(prev => ({ ...prev, [field]: value }));
         setIsDirty(true);
         if (errors[field]) {
-            setErrors(prev => {
-                const next = { ...prev };
-                delete next[field];
-                return next;
-            });
+            setErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
         }
     };
 
-    const validateField = (field: string) => {
-        const newErrors = { ...errors };
+    const validate = () => {
+        const newErrors: Record<string, string> = {};
 
-        if (field === 'vitals' || field === 'bloodPressure' || field === 'heartRate') {
-            const hasBp = !!formData.bloodPressure;
-            const hasHr = formData.heartRate !== undefined && formData.heartRate !== null && !isNaN(formData.heartRate);
+        // Huyết áp — bắt buộc
+        if (!formData.bloodPressure.trim()) {
+            newErrors.bloodPressure = 'Vui lòng nhập huyết áp.';
+        } else if (!/^\d{2,3}\/\d{2,3}$/.test(formData.bloodPressure.trim())) {
+            newErrors.bloodPressure = 'Định dạng phải là Tâm thu/Tâm trương (ví dụ: 120/80).';
+        }
 
-            if (!hasBp && !hasHr) {
-                newErrors.bloodPressure = 'Vui lòng nhập Huyết áp hoặc Nhịp tim.';
-                newErrors.heartRate = 'Vui lòng nhập Huyết áp hoặc Nhịp tim.';
-            } else {
-                if (hasBp) {
-                    if (!/^\d{2,3}\/\d{2,3}$/.test(formData.bloodPressure || '')) {
-                        newErrors.bloodPressure = 'Định dạng phải là Tâm thu/Tâm trương (ví dụ: 120/80).';
-                    } else {
-                        delete newErrors.bloodPressure;
-                        if (newErrors.heartRate === 'Vui lòng nhập Huyết áp hoặc Nhịp tim.') {
-                            delete newErrors.heartRate;
-                        }
-                    }
-                } else {
-                    delete newErrors.bloodPressure;
-                }
-
-                if (hasHr) {
-                    if (formData.heartRate! < 30 || formData.heartRate! > 250) {
-                        newErrors.heartRate = 'Vui lòng nhập nhịp tim thực tế (30-250 bpm).';
-                    } else {
-                        delete newErrors.heartRate;
-                        if (newErrors.bloodPressure === 'Vui lòng nhập Huyết áp hoặc Nhịp tim.') {
-                            delete newErrors.bloodPressure;
-                        }
-                    }
-                } else {
-                    delete newErrors.heartRate;
-                }
+        // Nhịp tim — bắt buộc
+        if (!formData.heartRate.trim()) {
+            newErrors.heartRate = 'Vui lòng nhập nhịp tim.';
+        } else {
+            const hr = parseInt(formData.heartRate);
+            if (isNaN(hr) || hr < 30 || hr > 250) {
+                newErrors.heartRate = 'Nhịp tim phải từ 30 đến 250 bpm.';
             }
         }
 
-        if (field === 'weight') {
-            if (!formData.weight) {
-                newErrors.weight = 'Vui lòng nhập cân nặng.';
-            } else if (formData.weight < 20 || formData.weight > 500) {
-                newErrors.weight = 'Vui lòng nhập cân nặng thực tế.';
-            } else {
-                delete newErrors.weight;
+        // Cân nặng — bắt buộc
+        if (!formData.weight.trim()) {
+            newErrors.weight = 'Vui lòng nhập cân nặng.';
+        } else {
+            const w = parseFloat(formData.weight);
+            if (isNaN(w) || w < 20 || w > 500) {
+                newErrors.weight = 'Cân nặng phải từ 20 đến 500 kg.';
             }
         }
 
@@ -124,26 +92,39 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
     };
 
     const handleSave = async () => {
-        if (!validateField(measurementType)) return;
+        if (!validate()) return;
 
         try {
             setLoading(true);
 
             const payload: CreateHealthLogPayload = {
-                userId: userId,
+                userId,
                 date: timestamp,
-                bloodPressure: measurementType === 'vitals' ? (formData.bloodPressure || '-') : '-',
-                heartRate: measurementType === 'vitals' ? formData.heartRate : undefined,
-                weight: measurementType === 'weight' ? formData.weight : undefined,
-                note: formData.note
+                bloodPressure: formData.bloodPressure.trim(),
+                heartRate: parseInt(formData.heartRate),
+                weight: parseFloat(formData.weight),
+                note: formData.note || undefined,
+                recordedBy: 'caregiver',
             };
 
-            await healthApi.createHealthLog(payload);
+            const result = await healthApi.createHealthLog(payload);
+
+            try {
+                const savedLog = result.data;
+                socketService.emit('health_log_submitted', {
+                    userId,
+                    healthLogId: savedLog?.id || '',
+                    bloodPressure: payload.bloodPressure,
+                    heartRate: payload.heartRate,
+                    weight: payload.weight,
+                    recordedBy: 'caregiver',
+                });
+            } catch (e) {
+                console.warn('[HealthEntryForm] Failed to emit socket event:', e);
+            }
 
             setSaveSuccess(true);
-            setTimeout(() => {
-                onSuccess();
-            }, 1500);
+            setTimeout(() => { onSuccess(); }, 1500);
         } catch (err) {
             console.error(err);
         } finally {
@@ -152,12 +133,15 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
     };
 
     const handleClose = () => {
-        if (isDirty) {
-            setShowCancelModal(true);
-        } else {
-            onClose();
-        }
+        if (isDirty) setShowCancelModal(true);
+        else onClose();
     };
+
+    const inputStyle = (field: string): React.CSSProperties => ({
+        height: '48px', width: '100%', borderRadius: '8px',
+        border: errors[field] ? '2px solid var(--hp-critical)' : '1px solid var(--hp-border)',
+        padding: '0 1rem', fontSize: '1.125rem', boxSizing: 'border-box'
+    });
 
     return (
         <div className="health-page-container" style={{ maxWidth: '800px' }}>
@@ -166,7 +150,7 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
                     <X size={20} /> Đóng
                 </button>
                 <h1>{editingLog ? 'Sửa Hồ Sơ Sức Khỏe' : 'Thêm Hồ Sơ Sức Khỏe'}</h1>
-                <p>Cung cấp thông tin đo lường chính xác dưới đây để hỗ trợ quyết định chăm sóc.</p>
+                <p>Vui lòng nhập đầy đủ các chỉ số sức khỏe bên dưới.</p>
             </header>
 
             {saveSuccess ? (
@@ -184,15 +168,7 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
                                 <p style={{ margin: 0, fontWeight: 600 }}>{new Date(editingLog.date).toLocaleString()}</p>
                             </div>
                             {editingLog.recordedBy === 'self' && (
-                                <div style={{
-                                    backgroundColor: '#dcfce7',
-                                    color: '#15803d',
-                                    fontSize: '0.875rem',
-                                    fontWeight: 700,
-                                    padding: '4px 12px',
-                                    borderRadius: '16px',
-                                    border: '1px solid #bbf7d0'
-                                }}>
+                                <div style={{ backgroundColor: '#dcfce7', color: '#15803d', fontSize: '0.875rem', fontWeight: 700, padding: '4px 12px', borderRadius: '16px', border: '1px solid #bbf7d0' }}>
                                     Tự ghi
                                 </div>
                             )}
@@ -200,94 +176,68 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
                     )}
 
                     <section style={{ marginBottom: '2rem' }}>
-                        <h3 className="section-title"><Activity size={20} /> Thông Tin Đo Lường</h3>
-                        <div className="metric-toggles" style={{ width: 'fit-content' }}>
-                            {(['vitals', 'weight'] as const).map(type => (
-                                <button
-                                    key={type}
-                                    className={`metric-toggle ${measurementType === type ? 'active' : ''}`}
-                                    onClick={() => { setMeasurementType(type); setIsDirty(true); }}
-                                    disabled={!!editingLog}
-                                >
-                                    {type === 'vitals' ? 'Huyết Áp & Nhịp Tim' : 'Cân Nặng'}
-                                </button>
-                            ))}
+                        <h3 className="section-title"><Heart size={20} /> Chỉ Số Sức Khỏe <span style={{ color: 'var(--hp-critical)', fontSize: '0.875rem', fontWeight: 400 }}>(Tất cả bắt buộc)</span></h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+                            {/* Huyết áp */}
+                            <div className="form-group">
+                                <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem' }}>
+                                    Huyết Áp (mmHg) <span style={{ color: 'var(--hp-critical)' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Ví dụ: 120/80"
+                                    value={formData.bloodPressure}
+                                    onChange={(e) => handleInputChange('bloodPressure', e.target.value)}
+                                    onBlur={validate}
+                                    style={inputStyle('bloodPressure')}
+                                />
+                                {errors.bloodPressure && <p style={{ color: 'var(--hp-critical)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{errors.bloodPressure}</p>}
+                            </div>
+
+                            {/* Nhịp tim */}
+                            <div className="form-group">
+                                <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem' }}>
+                                    Nhịp Tim (bpm) <span style={{ color: 'var(--hp-critical)' }}>*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    placeholder="Ví dụ: 72"
+                                    value={formData.heartRate}
+                                    onChange={(e) => handleInputChange('heartRate', e.target.value)}
+                                    onBlur={validate}
+                                    style={inputStyle('heartRate')}
+                                />
+                                {errors.heartRate && <p style={{ color: 'var(--hp-critical)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{errors.heartRate}</p>}
+                            </div>
+
+                            {/* Cân nặng */}
+                            <div className="form-group">
+                                <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem' }}>
+                                    Cân Nặng (kg) <span style={{ color: 'var(--hp-critical)' }}>*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    step="0.1"
+                                    placeholder="Ví dụ: 70.5"
+                                    value={formData.weight}
+                                    onChange={(e) => handleInputChange('weight', e.target.value)}
+                                    onBlur={validate}
+                                    style={inputStyle('weight')}
+                                />
+                                {errors.weight && <p style={{ color: 'var(--hp-critical)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{errors.weight}</p>}
+                            </div>
                         </div>
                     </section>
 
                     <section style={{ marginBottom: '2rem' }}>
-                        <h3 className="section-title"><Heart size={20} /> Giá Trị Đo Lường</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-                            {measurementType === 'vitals' && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                                    <div className="form-group">
-                                        <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem' }}>
-                                            Huyết Áp (mmHg) <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Không bắt buộc)</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            placeholder="Ví dụ: 120/80"
-                                            value={formData.bloodPressure}
-                                            onChange={(e) => handleInputChange('bloodPressure', e.target.value)}
-                                            onBlur={() => validateField('vitals')}
-                                            style={{ height: '48px', width: '100%', borderRadius: '8px', border: errors.bloodPressure ? '2px solid var(--hp-critical)' : '1px solid var(--hp-border)', padding: '0 1rem', fontSize: '1.125rem' }}
-                                        />
-                                        {errors.bloodPressure && <p style={{ color: 'var(--hp-critical)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{errors.bloodPressure}</p>}
-                                    </div>
-                                    <div className="form-group">
-                                        <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem' }}>
-                                            Nhịp Tim (bpm) <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Không bắt buộc)</span>
-                                        </label>
-                                        <input
-                                            type="number"
-                                            placeholder="Ví dụ: 72"
-                                            value={formData.heartRate || ''}
-                                            onChange={(e) => {
-                                                const val = e.target.value ? parseInt(e.target.value) : undefined;
-                                                handleInputChange('heartRate', val);
-                                            }}
-                                            onBlur={() => validateField('vitals')}
-                                            style={{ height: '48px', width: '100%', borderRadius: '8px', border: errors.heartRate ? '2px solid var(--hp-critical)' : '1px solid var(--hp-border)', padding: '0 1rem', fontSize: '1.125rem' }}
-                                        />
-                                        {errors.heartRate && <p style={{ color: 'var(--hp-critical)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{errors.heartRate}</p>}
-                                    </div>
-                                </div>
-                            )}
-
-                            {measurementType === 'weight' && (
-                                <div className="form-group">
-                                    <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem' }}>
-                                        Cân Nặng (kg) <span style={{ color: '#94a3b8', fontWeight: 400 }}>(Bắt buộc)</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        placeholder="Ví dụ: 70.5"
-                                        value={formData.weight || ''}
-                                        onChange={(e) => handleInputChange('weight', parseFloat(e.target.value))}
-                                        onBlur={() => validateField('weight')}
-                                        style={{ height: '48px', width: '100%', borderRadius: '8px', border: errors.weight ? '2px solid var(--hp-critical)' : '1px solid var(--hp-border)', padding: '0 1rem', fontSize: '1.125rem' }}
-                                    />
-                                    {errors.weight && <p style={{ color: 'var(--hp-critical)', fontSize: '0.875rem', marginTop: '0.5rem' }}>{errors.weight}</p>}
-                                </div>
-                            )}
-                        </div>
-                    </section>
-
-                    <section style={{ marginBottom: '2rem' }}>
-                        <h3 className="section-title"><Clock size={20} /> Thời Gian & Bối Cảnh</h3>
+                        <h3 className="section-title"><Clock size={20} /> Thời Gian</h3>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                             <div>
                                 <label style={{ display: 'block', fontWeight: 700, marginBottom: '0.5rem' }}><Calendar size={14} /> Ngày</label>
                                 <input
                                     type="date"
                                     value={timestamp.split('T')[0]}
-                                    onChange={(e) => {
-                                        const time = timestamp.split('T')[1] || '00:00:00';
-                                        setTimestamp(`${e.target.value}T${time}`);
-                                        setIsDirty(true);
-                                    }}
+                                    onChange={(e) => { const time = timestamp.split('T')[1] || '00:00:00'; setTimestamp(`${e.target.value}T${time}`); setIsDirty(true); }}
                                     style={{ height: '48px', width: '100%', borderRadius: '8px', border: '1px solid var(--hp-border)', padding: '0 1rem' }}
                                 />
                             </div>
@@ -296,11 +246,7 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
                                 <input
                                     type="time"
                                     value={timestamp.split('T').length > 1 ? timestamp.split('T')[1].substring(0, 5) : '00:00'}
-                                    onChange={(e) => {
-                                        const date = timestamp.split('T')[0];
-                                        setTimestamp(`${date}T${e.target.value}:00.000Z`);
-                                        setIsDirty(true);
-                                    }}
+                                    onChange={(e) => { const date = timestamp.split('T')[0]; setTimestamp(`${date}T${e.target.value}:00.000Z`); setIsDirty(true); }}
                                     style={{ height: '48px', width: '100%', borderRadius: '8px', border: '1px solid var(--hp-border)', padding: '0 1rem' }}
                                 />
                             </div>
@@ -313,7 +259,7 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
                             placeholder="Các triệu chứng hoặc tình trạng quan sát được..."
                             value={formData.note}
                             onChange={(e) => handleInputChange('note', e.target.value)}
-                            style={{ width: '100%', height: '120px', borderRadius: '12px', border: '1px solid var(--hp-border)', padding: '1rem', fontSize: '1rem', resize: 'vertical' }}
+                            style={{ width: '100%', height: '120px', borderRadius: '12px', border: '1px solid var(--hp-border)', padding: '1rem', fontSize: '1rem', resize: 'vertical', boxSizing: 'border-box' }}
                         />
                     </section>
 
@@ -343,16 +289,12 @@ const HealthEntryForm = ({ userId, editingLog, onClose, onSuccess }: HealthEntry
                         <h2 style={{ marginBottom: '1rem' }}>Thay Đổi Chưa Lưu</h2>
                         <p style={{ color: 'var(--hp-text-muted)', marginBottom: '2rem' }}>Bạn đã nhập thông tin nhưng chưa lưu. Bạn có chắc chắn muốn hủy bỏ hồ sơ này không?</p>
                         <div style={{ display: 'flex', gap: '1rem' }}>
-                            <button
-                                style={{ flex: 1, padding: '1rem', borderRadius: '8px', border: 'none', background: 'var(--hp-critical)', color: 'white', fontWeight: 700, cursor: 'pointer' }}
-                                onClick={() => { setShowCancelModal(false); setIsDirty(false); onClose(); }}
-                            >
+                            <button style={{ flex: 1, padding: '1rem', borderRadius: '8px', border: 'none', background: 'var(--hp-critical)', color: 'white', fontWeight: 700, cursor: 'pointer' }}
+                                onClick={() => { setShowCancelModal(false); setIsDirty(false); onClose(); }}>
                                 Hủy Bỏ
                             </button>
-                            <button
-                                style={{ flex: 1, padding: '1rem', borderRadius: '8px', border: '1px solid var(--hp-border)', background: 'white', fontWeight: 700, cursor: 'pointer' }}
-                                onClick={() => setShowCancelModal(false)}
-                            >
+                            <button style={{ flex: 1, padding: '1rem', borderRadius: '8px', border: '1px solid var(--hp-border)', background: 'white', fontWeight: 700, cursor: 'pointer' }}
+                                onClick={() => setShowCancelModal(false)}>
                                 Tiếp Tục Chỉnh Sửa
                             </button>
                         </div>

@@ -3,8 +3,8 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // Use 10.0.2.2 for Android Emulator, localhost for iOS/Web
-  static const String baseUrl = 'http://192.168.0.160:5041/api';
-  static const String serverUrl = 'http://192.168.0.160:5041';
+  static const String baseUrl = 'http://192.168.1.6:5041/api';
+  static const String serverUrl = 'http://192.168.1.6:5041';
   
   static String? _token;
 

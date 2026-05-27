@@ -57,7 +57,12 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<AppointmentDbContext>();
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        
         context.Database.Migrate();
+        
+        // Seed initial data
+        AppointmentService.Data.DataSeeder.SeedData(context, logger);
     }
     catch (System.Exception ex)
     {

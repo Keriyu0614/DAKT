@@ -4,6 +4,9 @@ import '../services/socket_service.dart';
 import '../services/local_notification_service.dart';
 import '../models/reminder_model.dart';
 import '../models/medication_model.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'package:vibration/vibration.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class MedicationReminderScreen extends StatefulWidget {
   final ReminderModel? reminder;
@@ -36,10 +39,34 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen>
     _pulseAnim = Tween<double>(begin: 1.0, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    _startAlarm();
+  }
+
+  Future<void> _startAlarm() async {
+    // Cancel the system notification if it was triggered via background insistent alarm
+    if (widget.reminder != null) {
+      final notifyId = widget.reminder!.id.hashCode;
+      await FlutterLocalNotificationsPlugin().cancel(notifyId);
+    }
+    
+    FlutterRingtonePlayer().playAlarm(looping: true);
+    
+    final bool? hasVibrator = await Vibration.hasVibrator();
+    if (hasVibrator == true) {
+      // Vibrate for 1s, pause for 1s, repeat from index 0
+      Vibration.vibrate(pattern: [1000, 1000], repeat: 0);
+    }
+  }
+
+  void _stopAlarm() {
+    FlutterRingtonePlayer().stop();
+    Vibration.cancel();
   }
 
   @override
   void dispose() {
+    _stopAlarm();
     _pulseController.dispose();
     super.dispose();
   }
@@ -191,9 +218,14 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen>
               if (!_confirmed) ...[
                 ElevatedButton.icon(
                   onPressed: () {
+                    _stopAlarm();
                     setState(() => _confirmed = true);
                     if (widget.reminder != null) {
-                      SocketService.emitMedicationTaken(widget.reminder!.id);
+                      SocketService.emitMedicationTaken(
+                        widget.reminder!.id,
+                        medicationName: widget.medication?.medicationName,
+                        userId: widget.reminder!.userId,
+                      );
                     }
                   },
                   icon: const Icon(Icons.check_circle_outline_rounded, size: 24),
@@ -209,20 +241,33 @@ class _MedicationReminderScreenState extends State<MedicationReminderScreen>
                 ),
                 const SizedBox(height: 14),
                 OutlinedButton.icon(
-                  onPressed: () {
-                    // Schedule a local snooze notification for 5 minutes from now
-                    LocalNotificationService.triggerLocalSnooze(
+                   onPressed: () async {
+                    _stopAlarm();
+                    // Emit snoozed event to notify caregiver
+                    if (widget.reminder != null) {
+                      SocketService.emitMedicationSnoozed(
+                        widget.reminder!.id,
+                        medicationName: widget.medication?.medicationName,
+                        userId: widget.reminder!.userId,
+                      );
+                    }
+                    // Await snooze scheduling to ensure it completes before cancelAll() runs
+                    await LocalNotificationService.triggerLocalSnooze(
                       widget.reminder?.id ?? 'manual_snooze_${DateTime.now().millisecondsSinceEpoch}',
                       'Nhắc nhở uống thuốc',
                       'Đã đến giờ uống thuốc ${widget.medication?.medicationName ?? ""}! Hãy uống ngay nhé.',
+                      userId: widget.reminder?.userId,
+                      medName: widget.medication?.medicationName,
                     );
+                    if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Sẽ nhắc lại sau 5 phút'),
                         duration: Duration(seconds: 2),
                       ),
                     );
-                    Navigator.pop(context);
+                    // Pop with 'snoozed' so HomeScreen removes the dialogKey from shown list
+                    Navigator.pop(context, 'snoozed');
                   },
                   icon: const Icon(Icons.cancel_outlined, size: 22),
                   label: const Text('Chưa uống được'),

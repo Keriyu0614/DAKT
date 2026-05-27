@@ -6,6 +6,7 @@ import 'services/local_notification_service.dart';
 import 'services/socket_service.dart';
 
 final RouteObserver<ModalRoute<void>> routeObserver = RouteObserver<ModalRoute<void>>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,7 @@ class ElderCareApp extends StatelessWidget {
       title: 'CareRemind',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
+      navigatorKey: navigatorKey,
       navigatorObservers: [routeObserver],
       home: const LoginScreen(),
     );

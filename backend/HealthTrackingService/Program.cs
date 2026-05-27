@@ -58,7 +58,12 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var context = services.GetRequiredService<HealthDbContext>();
+        var logger = services.GetRequiredService<ILogger<Program>>();
+        
         context.Database.Migrate();
+        
+        // Seed initial data
+        HealthTrackingService.Data.DataSeeder.SeedData(context, logger);
     }
     catch (Exception ex)
     {

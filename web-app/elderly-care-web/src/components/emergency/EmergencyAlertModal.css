@@ -1,0 +1,283 @@
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+.emergency-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  animation: overlayFadeIn 0.3s ease;
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.emergency-modal {
+  position: relative;
+  width: min(480px, 92vw);
+  background: #fff;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 4px rgba(220, 38, 38, 0.3),
+    0 32px 64px rgba(0, 0, 0, 0.4);
+  animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalSlideIn {
+  from { transform: scale(0.7) translateY(40px); opacity: 0; }
+  to   { transform: scale(1) translateY(0);      opacity: 1; }
+}
+
+.emergency-modal.acknowledged {
+  box-shadow:
+    0 0 0 4px rgba(22, 163, 74, 0.3),
+    0 32px 64px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Close button ────────────────────────────────────────────────────────── */
+.emergency-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.emergency-close-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.emergency-header {
+  position: relative;
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  padding: 36px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+/* Pulse ring animation */
+.emergency-pulse-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: pulseRing 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseRing {
+  0%   { box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0.3); }
+  50%  { box-shadow: inset 0 0 0 12px rgba(255, 255, 255, 0); }
+  100% { box-shadow: inset 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+.emergency-icon-wrap {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 3px solid rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: iconPulse 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes iconPulse {
+  from { transform: scale(1);    box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+  to   { transform: scale(1.08); box-shadow: 0 0 0 16px rgba(255,255,255,0); }
+}
+
+.emergency-badge {
+  background: rgba(255, 255, 255, 0.2);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  padding: 4px 14px;
+  border-radius: 20px;
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.emergency-body {
+  padding: 24px 28px 8px;
+  text-align: center;
+}
+
+.emergency-title {
+  font-size: 22px;
+  font-weight: 900;
+  color: #7f1d1d;
+  margin: 0 0 10px;
+  line-height: 1.3;
+}
+
+.emergency-message {
+  font-size: 15px;
+  color: #4b5563;
+  margin: 0 0 14px;
+  line-height: 1.6;
+}
+
+.emergency-meta {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.emergency-time {
+  font-size: 13px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.emergency-location-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 8px;
+}
+
+.emergency-location-btn:hover {
+  background: #dbeafe;
+}
+
+/* ── Actions ─────────────────────────────────────────────────────────────── */
+.emergency-actions {
+  padding: 16px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.emergency-ack-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
+}
+
+.emergency-ack-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.5);
+}
+
+.emergency-ack-btn:active {
+  transform: translateY(0);
+}
+
+.emergency-dismiss-btn {
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.emergency-dismiss-btn:hover {
+  color: #6b7280;
+}
+
+/* ── Acknowledged state ──────────────────────────────────────────────────── */
+.emergency-ack-state {
+  padding: 48px 32px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: ackFadeIn 0.4s ease;
+}
+
+@keyframes ackFadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.emergency-ack-icon {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: #dcfce7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emergency-ack-state h2 {
+  font-size: 22px;
+  font-weight: 900;
+  color: #14532d;
+  margin: 0;
+}
+
+.emergency-ack-state p {
+  font-size: 15px;
+  color: #4b5563;
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .emergency-modal {
+    border-radius: 20px 20px 0 0;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+  }
+
+  .emergency-overlay {
+    align-items: flex-end;
+  }
+}

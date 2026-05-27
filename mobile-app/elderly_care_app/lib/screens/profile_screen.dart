@@ -49,6 +49,141 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _showChangePasswordDialog() {
+    final currentPwCtrl = TextEditingController();
+    final newPwCtrl = TextEditingController();
+    final confirmPwCtrl = TextEditingController();
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+    bool isLoading = false;
+    String? errorMsg;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Đổi mật khẩu'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (errorMsg != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.danger.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      errorMsg!,
+                      style: const TextStyle(color: AppTheme.danger, fontSize: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextField(
+                  controller: currentPwCtrl,
+                  obscureText: obscureCurrent,
+                  decoration: InputDecoration(
+                    labelText: 'Mật khẩu hiện tại',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureCurrent ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => obscureCurrent = !obscureCurrent),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: newPwCtrl,
+                  obscureText: obscureNew,
+                  decoration: InputDecoration(
+                    labelText: 'Mật khẩu mới',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureNew ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => obscureNew = !obscureNew),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: confirmPwCtrl,
+                  obscureText: obscureConfirm,
+                  decoration: InputDecoration(
+                    labelText: 'Xác nhận mật khẩu mới',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                      onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            TextButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final current = currentPwCtrl.text.trim();
+                      final newPw = newPwCtrl.text.trim();
+                      final confirm = confirmPwCtrl.text.trim();
+
+                      if (current.isEmpty || newPw.isEmpty || confirm.isEmpty) {
+                        setDialogState(() => errorMsg = 'Vui lòng nhập đầy đủ thông tin.');
+                        return;
+                      }
+                      if (newPw.length < 6) {
+                        setDialogState(() => errorMsg = 'Mật khẩu mới phải có ít nhất 6 ký tự.');
+                        return;
+                      }
+                      if (newPw != confirm) {
+                        setDialogState(() => errorMsg = 'Mật khẩu xác nhận không khớp.');
+                        return;
+                      }
+
+                      setDialogState(() { isLoading = true; errorMsg = null; });
+
+                      final result = await AuthService.changePassword(
+                        currentPassword: current,
+                        newPassword: newPw,
+                      );
+
+                      setDialogState(() => isLoading = false);
+
+                      if (result['success'] == true) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Đổi mật khẩu thành công'),
+                            backgroundColor: AppTheme.secondary,
+                          ),
+                        );
+                      } else {
+                        setDialogState(() => errorMsg = result['message'] ?? 'Đổi mật khẩu thất bại.');
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Xác nhận', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showError(String message) {
     showDialog(
       context: context,
@@ -71,21 +206,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (context) => SafeArea(
         child: Wrap(
           children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library_rounded),
-              title: const Text('Thư viện ảnh'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: const Icon(Icons.photo_library_rounded),
+                title: const Text('Thư viện ảnh'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt_rounded),
-              title: const Text('Máy ảnh'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                leading: const Icon(Icons.camera_alt_rounded),
+                title: const Text('Máy ảnh'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
             ),
           ],
         ),
@@ -113,7 +254,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 (route) => false,
               );
             },
-            child: const Text('Đăng xuất', style: TextStyle(color: AppTheme.danger)),
+            child: const Text('Đăng xuất',
+                style: TextStyle(color: AppTheme.danger)),
           ),
         ],
       ),
@@ -135,22 +277,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
             const SizedBox(height: 32),
-            // Profile Header / Avatar
+
+            // Avatar
             Center(
               child: Stack(
                 children: [
                   GestureDetector(
-                    onTap: _isUploading ? null : () => _showImageSourceActionSheet(context),
+                    onTap: _isUploading
+                        ? null
+                        : () => _showImageSourceActionSheet(context),
                     child: Container(
                       width: 120,
                       height: 120,
                       decoration: BoxDecoration(
                         color: AppTheme.primaryLight,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppTheme.primary, width: 3),
+                        border:
+                            Border.all(color: AppTheme.primary, width: 3),
                         image: user?.avatarUrl != null
                             ? DecorationImage(
-                                image: NetworkImage('${ApiService.serverUrl}${user!.avatarUrl}'),
+                                image: NetworkImage(
+                                    '${ApiService.serverUrl}${user!.avatarUrl}'),
                                 fit: BoxFit.cover,
                               )
                             : null,
@@ -180,7 +327,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: AppTheme.secondary,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
+                          child: const Icon(Icons.edit_rounded,
+                              color: Colors.white, size: 20),
                         ),
                       ),
                     ),
@@ -188,6 +336,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 16),
+
             Text(
               user?.name ?? 'Chưa cập nhật',
               style: const TextStyle(
@@ -205,47 +354,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 32),
-
-            // Info Cards
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppTheme.card,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _buildInfoItem(
-                      icon: Icons.badge_rounded,
-                      label: 'Vai trò',
-                      value: user?.role == 'Elderly' ? 'Người cao tuổi' : 'Người chăm sóc',
-                      showDivider: true,
-                    ),
-                    _buildInfoItem(
-                      icon: Icons.phone_rounded,
-                      label: 'Số điện thoại',
-                      value: 'Chưa cập nhật',
-                      showDivider: true,
-                    ),
-                    _buildInfoItem(
-                      icon: Icons.location_on_rounded,
-                      label: 'Địa chỉ',
-                      value: 'Hà Nội, Việt Nam',
-                      showDivider: false,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
 
             // Settings Section
             Padding(
@@ -267,17 +375,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildActionItem(
                       icon: Icons.security_rounded,
                       label: 'Đổi mật khẩu',
-                      onTap: () {},
+                      onTap: () => _showChangePasswordDialog(),
                       iconColor: AppTheme.primary,
                     ),
-                    const Divider(height: 1, color: AppTheme.divider, indent: 60),
-                    _buildActionItem(
-                      icon: Icons.language_rounded,
-                      label: 'Ngôn ngữ',
-                      onTap: () {},
-                      iconColor: AppTheme.secondary,
-                    ),
-                    const Divider(height: 1, color: AppTheme.divider, indent: 60),
+                    const Divider(
+                        height: 1, color: AppTheme.divider, indent: 60),
                     _buildActionItem(
                       icon: Icons.logout_rounded,
                       label: 'Đăng xuất',
@@ -296,59 +398,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildInfoItem({
-    required IconData icon,
-    required String label,
-    required String value,
-    bool showDivider = true,
-  }) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryLight,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: AppTheme.primary, size: 24),
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        if (showDivider)
-          const Padding(
-            padding: EdgeInsets.only(left: 76),
-            child: Divider(height: 1, color: AppTheme.divider),
-          ),
-      ],
-    );
-  }
-
   Widget _buildActionItem({
     required IconData icon,
     required String label,
@@ -356,27 +405,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required Color iconColor,
     Color? textColor,
   }) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(10),
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        onTap: onTap,
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: iconColor, size: 22),
         ),
-        child: Icon(icon, color: iconColor, size: 22),
-      ),
-      title: Text(
-        label,
-        style: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: textColor ?? AppTheme.textPrimary,
+        title: Text(
+          label,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: textColor ?? AppTheme.textPrimary,
+          ),
         ),
+        trailing: const Icon(Icons.chevron_right_rounded,
+            color: AppTheme.textMuted),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.textMuted),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
   }
 }

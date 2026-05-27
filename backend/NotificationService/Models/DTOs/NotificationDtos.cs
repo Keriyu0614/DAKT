@@ -121,6 +121,8 @@ public class NotificationSummaryDto
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public Guid SourceReminderId { get; set; }
+    public SourceEventType SourceEventType { get; set; }
+    public Guid SourceEventId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public NotificationStatus Status { get; set; }
@@ -142,6 +144,8 @@ public class NotificationSummaryDto
             Id = notification.Id,
             UserId = notification.UserId,
             SourceReminderId = notification.SourceReminderId,
+            SourceEventType = notification.SourceEventType,
+            SourceEventId = notification.SourceEventId,
             Title = notification.Title,
             Message = notification.Message,
             Status = notification.Status,

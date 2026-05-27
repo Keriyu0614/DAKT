@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { useAuth } from '../../context/AuthContext';
 import { medicationService } from '../../services/medication.service';
 import type { Medication } from '../../api/medication.api';
 import './MedicationForm.css';
@@ -52,6 +53,7 @@ const MedicationForm = ({
     onSuccess,
     userId
 }: MedicationFormProps) => {
+    const { user, managedElderly } = useAuth();
     const [formData, setFormData] = useState<MedicationFormData>(INITIAL_FORM);
     const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
@@ -90,6 +92,10 @@ const MedicationForm = ({
             errors.endDate = 'Ngày kết thúc không thể trước ngày bắt đầu';
         }
 
+        if (!userId && !user?.id) {
+            errors.userId = 'Không xác định được người dùng để lưu thuốc';
+        }
+
         setFormErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -107,9 +113,20 @@ const MedicationForm = ({
             }
         }
 
+        const actualUserId = userId || managedElderly?.id || user?.id;
+        console.log('[MedicationForm] Saving medication with userId:', actualUserId);
+        console.log('[MedicationForm] userId prop:', userId);
+        console.log('[MedicationForm] managedElderly?.id:', managedElderly?.id);
+        console.log('[MedicationForm] user?.id:', user?.id);
+        
+        if (!actualUserId) {
+            toast.error('Không xác định được tài khoản người dùng. Vui lòng đăng nhập lại.');
+            return;
+        }
+
         try {
             const payload: Partial<Medication> = {
-                userId: userId,
+                userId: actualUserId,
                 name: formData.name,
                 form: formData.form,
                 dosage: {
@@ -127,6 +144,8 @@ const MedicationForm = ({
                 endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined,
                 instructions: formData.instructions
             };
+
+            console.log('[MedicationForm] Payload:', payload);
 
             if (editingId) {
                 await medicationService.updateMedication(editingId, payload);

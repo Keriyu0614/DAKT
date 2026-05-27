@@ -1,13 +1,12 @@
 import { useEffect, useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { io } from "socket.io-client";
+//import { io } from "socket.io-client";
+import { socketService } from '../../services/socket.service';
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import {
-    Plus,
     MoreVertical,
     Activity,
-    Pill,
     AlertTriangle,
     AlertCircle
 } from "lucide-react";
@@ -16,7 +15,6 @@ import { appointmentApi } from "../../api/appointment.api";
 import { medicationService } from "../../services/medication.service";
 import { type Medication } from "../../api/medication.api";
 import { reminderApi, type Reminder } from "../../api/reminder.api";
-import { healthApi, type HealthLog } from "../../api/health.api";
 import { notificationApi, type Notification } from "../../api/notification.api";
 import { useAuth } from "../../context/AuthContext";
 import authApi from "../../api/auth.api";
@@ -25,7 +23,6 @@ interface DashboardData {
     appointments: any[];
     medications: Medication[];
     reminders: Reminder[];
-    healthLogs: HealthLog[];
     notifications: Notification[];
     managedElderly: any[];
 }
@@ -39,7 +36,6 @@ export const DashboardPage = () => {
         appointments: [],
         medications: [],
         reminders: [],
-        healthLogs: [],
         notifications: [],
         managedElderly: []
     });
@@ -48,42 +44,41 @@ export const DashboardPage = () => {
     const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
     useEffect(() => {
-        const socket = io("http://localhost:5006");
+        socketService.connect();
 
-        socket.on("status_updated", (data: any) => {
+        const handleStatusUpdated = (data: any) => {
             console.log("Socket status_updated received in Dashboard:", data);
+            const status = typeof data.status === 'number' ? data.status : 1;
             setData(prev => ({
                 ...prev,
-                reminders: prev.reminders.map(r => 
-                    r.id === data.reminderId ? { ...r, status: 1 } : r
+                reminders: prev.reminders.map(r =>
+                    r.id === data.reminderId ? { ...r, status } : r
                 )
             }));
-        });
+        };
 
-        socket.on("medication_missed", (data: any) => {
+        const handleMedicationMissed = (data: any) => {
             console.log("Socket medication_missed received in Dashboard:", data);
             setData(prev => ({
                 ...prev,
-                reminders: prev.reminders.map(r => 
+                reminders: prev.reminders.map(r =>
                     r.id === data.reminderId ? { ...r, status: 2 } : r
                 )
             }));
-            
             toast.error(
-                `⚠️ Cảnh báo: Người thân đã bỏ lỡ lịch uống thuốc lúc ${
-                    data.updatedReminder?.scheduledTime
-                        ? new Date(data.updatedReminder.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        : ''
-                }!`,
-                {
-                    position: "top-right",
-                    autoClose: 10000,
-                }
+                `⚠️ Cảnh báo: Người thân đã bỏ lỡ lịch uống thuốc lúc ${data.updatedReminder?.scheduledTime
+                    ? new Date(data.updatedReminder.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : ''}!`,
+                { position: "top-right", autoClose: 10000 }
             );
-        });
+        };
+
+        socketService.on('status_updated', handleStatusUpdated);
+        socketService.on('medication_missed', handleMedicationMissed);
 
         return () => {
-            socket.disconnect();
+            socketService.off('status_updated', handleStatusUpdated);
+            socketService.off('medication_missed', handleMedicationMissed);
         };
     }, []);
 
@@ -92,24 +87,50 @@ export const DashboardPage = () => {
         const fetchDashboardData = async () => {
             try {
                 setLoading(true);
-                // Gọi song song tất cả các API
-                const [apptRes, medRes, remRes, healthRes, notifRes, elderlyRes] = await Promise.all([
-                    appointmentApi.getAll().catch(() => ({ data: [] })),
-                    medicationService.getMedications().catch(() => []),
-                    reminderApi.getReminders().catch(() => ({ data: [] })),
-                    healthApi.getHealthLogs().catch(() => ({ data: [] })),
-                    user?.id ? notificationApi.getNotifications(user.id).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
-                    user?.id ? authApi.getManagedElderly(user.id).catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
-                ]);
+
+                // Lấy danh sách người già được quản lý trước
+                const elderlyRes = await authApi.getManagedElderly(user!.id).catch(() => ({ data: [] }));
+                const managedElderly: any[] = (elderlyRes as any).data || [];
+
+                // Lấy notifications của người chăm sóc
+                const notifRes = await notificationApi.getNotifications(user!.id).catch(() => ({ data: [] }));
+
+                // Lấy medications, appointments, reminders của TẤT CẢ người già được quản lý
+                const elderlyIds: string[] = managedElderly.map((e: any) => e.id);
+
+                let allMedications: Medication[] = [];
+                let allAppointments: any[] = [];
+                let allReminders: Reminder[] = [];
+
+                if (elderlyIds.length > 0) {
+                    const results = await Promise.all(
+                        elderlyIds.map(eid => Promise.all([
+                            medicationService.getMedications(eid).catch(() => []),
+                            appointmentApi.getAll(eid).catch(() => ({ data: [] })),
+                            reminderApi.getReminders(eid).catch(() => ({ data: [] })),
+                        ]))
+                    );
+                    results.forEach(([meds, apts, rems]) => {
+                        allMedications = allMedications.concat(meds as Medication[]);
+                        allAppointments = allAppointments.concat((apts as any).data || []);
+                        allReminders = allReminders.concat((rems as any).data || []);
+                    });
+                }
 
                 setData({
-                    appointments: apptRes.data || [],
-                    medications: (medRes as any) || [],
-                    reminders: remRes.data || [],
-                    healthLogs: healthRes.data || [],
+                    appointments: allAppointments,
+                    medications: allMedications,
+                    reminders: allReminders,
                     notifications: (notifRes as any).data || [],
-                    managedElderly: (elderlyRes as any).data || []
+                    managedElderly
                 });
+
+                // DEBUG
+                console.log('[Dashboard] user.id:', user?.id);
+                console.log('[Dashboard] elderlyIds:', elderlyIds);
+                console.log('[Dashboard] medications count:', allMedications.length);
+                console.log('[Dashboard] appointments count:', allAppointments.length);
+
                 setError(null);
             } catch (err) {
                 console.error("Failed to load dashboard data", err);
@@ -132,32 +153,143 @@ export const DashboardPage = () => {
             new Date(b.scheduledTime).getTime() - new Date(a.scheduledTime).getTime()
         ), [data.reminders]);
 
-    // Thống kê tỷ lệ tuân thủ (giả lập dựa trên số nhắc nhở thành công / tổng số)
-    const complianceStats = useMemo(() => {
-        // Đây là logic mẫu, bạn có thể điều chỉnh tùy theo dữ liệu thực tế
-        return [60, 45, 70, 85, 40]; // Tương ứng T2, T3, T4, T5, T6
-    }, []);
-
-    // Hoạt động gần đây (Gộp nhắc nhở và lịch hẹn)
+    // Hoạt động gần đây: lấy trực tiếp từ medications + appointments
+    // Hiển thị 7 ngày qua + 7 ngày tới (bao gồm hôm nay) để luôn có dữ liệu
     const recentActivities = useMemo(() => {
-        const activities = [
-            ...data.reminders.map(r => ({
-                id: r.id,
-                title: r.type === 0 ? t('medications') : t('reminders'),
-                desc: r.status === 1 ? t('completed') : r.status === 2 ? t('missed_badge') : t('pending'),
-                time: new Date(r.scheduledTime),
-                status: r.status
-            })),
-            ...data.appointments.map(a => ({
-                id: a.id,
-                title: `${t('appointments')} Dr. ${a.doctorName}`,
-                desc: a.status || t('pending'),
-                time: new Date(a.appointmentDate),
-                status: 3
-            }))
-        ];
-        return activities.sort((a, b) => b.time.getTime() - a.time.getTime()).slice(0, 3);
-    }, [data.reminders, data.appointments, t]);
+        const activities: Array<{
+            id: string;
+            title: string;
+            desc: string;
+            time: Date;
+            status: number;
+            type: 'medication' | 'appointment';
+            details?: string;
+            navigateTo: string;
+        }> = [];
+
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const thirtyDaysLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+        // Xây map reminder status để tra cứu (key: medId-year-month-date-hour-minute local time)
+        const reminderStatusMap = new Map<string, 0 | 1 | 2>();
+        data.reminders.forEach(r => {
+            if (r.type === 0) {
+                const rTime = new Date(r.scheduledTime);
+                const key = `${r.referenceId}-${rTime.getFullYear()}-${rTime.getMonth()}-${rTime.getDate()}-${rTime.getHours()}-${rTime.getMinutes()}`;
+                reminderStatusMap.set(key, r.status);
+            }
+        });
+
+        // Medications: tạo entry cho mỗi lần uống trong window [-7, +30] ngày
+        data.medications.forEach(med => {
+            // Parse giờ uống - xử lý cả format "HH:mm" lẫn "12/30/1899 H:mm:ss AM/PM" (OADate từ Excel)
+            const parseTime = (t: string): string | null => {
+                t = t.trim();
+                if (/^\d{1,2}:\d{2}$/.test(t)) return t;
+                const oaMatch = t.match(/(\d{1,2}):(\d{2}):\d{2}\s*(AM|PM)/i);
+                if (oaMatch) {
+                    let h = parseInt(oaMatch[1]);
+                    const m = oaMatch[2];
+                    const ampm = oaMatch[3].toUpperCase();
+                    if (ampm === 'PM' && h !== 12) h += 12;
+                    if (ampm === 'AM' && h === 12) h = 0;
+                    return `${String(h).padStart(2, '0')}:${m}`;
+                }
+                return null;
+            };
+
+            const rawTimes: string[] = (med.frequency?.specificTimes || [])
+                .map(t => parseTime(t))
+                .filter((t): t is string => t !== null);
+
+            const times: string[] = rawTimes.length > 0
+                ? rawTimes
+                : ['08:00', '12:00', '18:00', '21:00'].slice(0, med.frequency?.timesPerDay || 1);
+
+            // Parse ngày bắt đầu/kết thúc tránh lệch UTC
+            const startStr = (med.startDate || '').substring(0, 10);
+            const [sy, sm, sd] = startStr.split('-').map(Number);
+            const medStart = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+
+            // Nếu không có endDate hoặc endDate = startDate (backend default) → coi như không giới hạn
+            let medEnd: Date | null = null;
+            if (med.endDate && med.endDate.substring(0, 10) !== startStr) {
+                const endStr = med.endDate.substring(0, 10);
+                const [ey, em, ed] = endStr.split('-').map(Number);
+                medEnd = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+            }
+
+            console.log(`[Dashboard] Med: ${med.name}, startDate raw: ${med.startDate}, endDate raw: ${med.endDate}, status: ${med.status}, times:`, times, 'medStart:', medStart, 'medEnd:', medEnd);
+
+            // Duyệt từ 7 ngày trước đến 30 ngày sau
+            for (let dayOffset = -7; dayOffset <= 30; dayOffset++) {
+                const targetDate = new Date(now.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+                const dayCheck = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 12, 0, 0, 0);
+                if (dayCheck < medStart || (medEnd && dayCheck > medEnd)) continue;
+
+                times.forEach(time => {
+                    const [hour, minute] = time.split(':').map(Number);
+                    const medTime = new Date(
+                        targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(),
+                        hour, minute, 0, 0
+                    );
+                    // Chỉ lấy trong window [-7, +30]
+                    if (medTime < sevenDaysAgo || medTime > thirtyDaysLater) return;
+
+                    const key = `${med.id}-${medTime.getFullYear()}-${medTime.getMonth()}-${medTime.getDate()}-${hour}-${minute}`;
+                    const reminderStatus = reminderStatusMap.get(key);
+                    // Nếu giờ đã qua mà không có reminder done → Đang chờ/Bỏ lỡ
+                    // Nếu giờ chưa tới → Sắp tới
+                    const isPast = medTime <= now;
+                    const status = reminderStatus !== undefined ? reminderStatus : (isPast ? 0 : 0);
+                    const statusText = status === 1 ? 'Đã hoàn thành'
+                                     : status === 2 ? 'Đã bỏ lỡ'
+                                     : isPast ? 'Đang chờ' : 'Sắp tới';
+
+                    activities.push({
+                        id: `med-${med.id}-${medTime.getTime()}`,
+                        title: `Uống thuốc ${med.name}`,
+                        desc: statusText,
+                        time: medTime,
+                        status,
+                        type: 'medication',
+                        details: `${med.dosage.amount} ${med.dosage.unit}${med.instructions ? ` · ${med.instructions}` : ''}`,
+                        navigateTo: `/app/health-schedule?id=${med.userId}&name=${encodeURIComponent(data.managedElderly.find((e: any) => e.id === med.userId)?.name || '')}`
+                    });
+                });
+            }
+        });
+
+        // Appointments: lấy trong window [-7, +30] ngày
+        data.appointments.forEach(apt => {
+            const aptTime = new Date(apt.appointmentDate);
+            if (aptTime < sevenDaysAgo || aptTime > thirtyDaysLater) return;
+
+            const status = apt.status === 'Completed' ? 1
+                         : apt.status === 'Missed' ? 2 : 0;
+            const statusText = apt.status === 'Completed' ? 'Đã hoàn thành'
+                             : apt.status === 'Cancelled' ? 'Đã hủy'
+                             : apt.status === 'Missed' ? 'Đã bỏ lỡ'
+                             : aptTime > now ? 'Sắp tới' : 'Đang chờ';
+
+            activities.push({
+                id: `apt-${apt.id}`,
+                title: `Khám bác sĩ ${apt.doctorName}`,
+                desc: statusText,
+                time: aptTime,
+                status,
+                type: 'appointment',
+                details: `${apt.specialty ? apt.specialty + ' · ' : ''}${apt.location}`,
+                navigateTo: `/app/health-schedule?id=${apt.userId}&name=${encodeURIComponent(data.managedElderly.find((e: any) => e.id === apt.userId)?.name || '')}`
+            });
+        });
+
+        // Sắp xếp: ưu tiên gần thời điểm hiện tại nhất (cả quá khứ lẫn tương lai)
+        return activities
+            .sort((a, b) => Math.abs(a.time.getTime() - now.getTime()) - Math.abs(b.time.getTime() - now.getTime()))
+            .slice(0, 5);
+    }, [data.medications, data.appointments, data.reminders]);
 
     // --- 3. Render giao diện ---
 
@@ -228,13 +360,16 @@ export const DashboardPage = () => {
                     </button>
                 </section>
             ) : (
-                <section className="priority-alert-box" style={{ backgroundColor: '#e8f5e9', borderColor: '#c8e6c9' }}>
-                    <div className="alert-icon-red" style={{ backgroundColor: '#4caf50' }}>✓</div>
-                    <div className="alert-text">
-                        <h2 style={{ color: '#2e7d32' }}>{t('everything_ok')}</h2>
-                        <p style={{ color: '#4caf50' }}>{t('all_done_desc')}</p>
-                    </div>
-                </section>
+                // Chỉ hiển thị "Mọi thứ đều ổn" khi không có reminder nào bị missed
+                data.reminders.length > 0 && data.reminders.every(r => r.status !== 2) ? (
+                    <section className="priority-alert-box" style={{ backgroundColor: '#e8f5e9', borderColor: '#c8e6c9' }}>
+                        <div className="alert-icon-red" style={{ backgroundColor: '#4caf50' }}>✓</div>
+                        <div className="alert-text">
+                            <h2 style={{ color: '#2e7d32' }}>{t('everything_ok')}</h2>
+                            <p style={{ color: '#4caf50' }}>{t('all_done_desc')}</p>
+                        </div>
+                    </section>
+                ) : null
             )}
 
             {/* Relatives Section */}
@@ -256,9 +391,9 @@ export const DashboardPage = () => {
                                     </div>
                                     <span className="relative-name">{person.name}</span>
                                     <div className="menu-container">
-                                        <MoreVertical 
-                                            size={20} 
-                                            className="more-icon" 
+                                        <MoreVertical
+                                            size={20}
+                                            className="more-icon"
                                             onClick={() => setMenuOpenId(menuOpenId === person.id ? null : person.id)}
                                         />
                                         {menuOpenId === person.id && (
@@ -277,12 +412,6 @@ export const DashboardPage = () => {
                                     <span>✅ {t('member')}</span>
                                 </div> */}
                                 <p className="next-schedule">{person.email}</p>
-                                <button
-                                    className="btn-details"
-                                    onClick={() => navigate(`/app/reports?id=${person.id}`)}
-                                >
-                                    {t('view_details')}
-                                </button>
                             </div>
                         ))
                     ) : (
@@ -295,41 +424,60 @@ export const DashboardPage = () => {
 
             {/* Bottom Grid: Stats & Activity */}
             <div className="bottom-grid">
-                {/* Biểu đồ tuân thủ */}
-                <div className="stat-box">
-                    <h3 className="stat-title"><Pill size={18} /> {t('compliance_rate')}</h3>
-                    <div className="chart-placeholder">
-                        {complianceStats.map((val, idx) => (
-                            <div
-                                key={idx}
-                                className={`bar ${idx === 3 ? 'active' : ''}`}
-                                style={{ height: `${val}%` }}
-                            ></div>
-                        ))}
-                    </div>
-                    <div className="chart-labels">
-                        <span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span>
-                    </div>
-                </div>
-
-                {/* Hoạt động gần đây từ API */}
+                {/* Hoạt động gần đây từ lịch cá nhân */}
                 <div className="stat-box">
                     <h3 className="stat-title"><Activity size={18} /> {t('recent_activity')}</h3>
                     <ul className="activity-list">
                         {recentActivities.length > 0 ? (
                             recentActivities.map((act) => (
-                                <li className="activity-item" key={act.id}>
-                                    <span className={`dot-indicator ${act.status === 1 ? 'bg-success' : act.status === 2 ? 'bg-danger' : 'bg-primary'}`}></span>
+                                <li
+                                    className="activity-item"
+                                    key={act.id}
+                                    onClick={() => navigate(act.navigateTo)}
+                                    style={{ cursor: 'pointer' }}
+                                    title="Xem lịch trình"
+                                >
+                                    <span className={`dot-indicator ${
+                                        act.status === 1 ? 'bg-success' : 
+                                        act.status === 2 ? 'bg-danger' : 'bg-primary'
+                                    }`}></span>
                                     <div className="activity-content">
-                                        <strong>{act.title}</strong> - {act.desc}
-                                        <span className="activity-time">{act.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        <strong>{act.title}</strong>
+                                        <span className="desc">{act.desc}</span>
+                                        {act.details && (
+                                            <small className="activity-details">{act.details}</small>
+                                        )}
+                                    </div>
+                                    <div className="activity-time-info">
+                                        <span className="activity-time">
+                                            {act.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                        <small className="activity-date">
+                                            {act.time.toLocaleDateString('vi-VN', { 
+                                                day: '2-digit', 
+                                                month: '2-digit' 
+                                            })}
+                                        </small>
                                     </div>
                                 </li>
                             ))
                         ) : (
-                            <p>{t('no_recent_activity')}</p>
+                            <li className="no-activity-msg">
+                                <p>{t('no_recent_activity')}</p>
+                                <small>Chưa có hoạt động nào trong 7 ngày qua</small>
+                            </li>
                         )}
                     </ul>
+                    {recentActivities.length > 0 && (
+                        <div className="activity-footer">
+                            <button 
+                                className="view-all-btn"
+                                onClick={() => navigate('/app/health-schedule')}
+                            >
+                                Xem tất cả lịch trình →
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

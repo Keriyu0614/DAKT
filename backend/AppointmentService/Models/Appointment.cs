@@ -24,7 +24,7 @@ public class Appointment
     /// <summary>
     /// Location where the appointment will take place
     /// </summary>
-    public string Location { get; set; } = string.Empty;
+    public string? Location { get; set; }
 
     /// <summary>
     /// Date and time of the appointment

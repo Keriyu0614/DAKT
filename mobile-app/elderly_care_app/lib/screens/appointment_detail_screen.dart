@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
+import '../models/appointment_model.dart';
+import '../services/socket_service.dart';
 import '../main.dart';
 
 class AppointmentDetailScreen extends StatelessWidget {
-  const AppointmentDetailScreen({super.key});
+  final AppointmentModel appointment;
+  const AppointmentDetailScreen({super.key, required this.appointment});
+
+  String _formatAppointmentDate(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final ampm = local.hour >= 12 ? 'CH' : 'SA';
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} ${hour.toString().padLeft(2, '0')}:$minute $ampm';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,9 +75,11 @@ class AppointmentDetailScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Khám tim mạch định kỳ',
-                      style: TextStyle(
+                    Text(
+                      appointment.doctorName.isNotEmpty
+                          ? 'Lịch khám với ${appointment.doctorName}'
+                          : 'Lịch khám',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
@@ -78,9 +91,9 @@ class AppointmentDetailScreen extends StatelessWidget {
                         const Icon(Icons.calendar_today_rounded,
                             color: Colors.white70, size: 16),
                         const SizedBox(width: 6),
-                        const Text(
-                          'Thứ Bảy, 03/05/2025  •  09:00 SA',
-                          style: TextStyle(
+                        Text(
+                          _formatAppointmentDate(appointment.appointmentDate),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
@@ -101,18 +114,13 @@ class AppointmentDetailScreen extends StatelessWidget {
                   _DetailRow(
                     icon: Icons.person_rounded,
                     label: 'Bác sĩ',
-                    value: 'BS. Nguyễn Văn An',
+                    value: appointment.doctorName,
                     highlight: true,
                   ),
                   _DetailRow(
-                    icon: Icons.medical_services_rounded,
-                    label: 'Chuyên khoa',
-                    value: 'Tim mạch',
-                  ),
-                  _DetailRow(
                     icon: Icons.local_hospital_rounded,
-                    label: 'Bệnh viện',
-                    value: 'Bệnh viện Chợ Rẫy',
+                    label: 'Địa điểm',
+                    value: appointment.location,
                   ),
                 ],
               ),
@@ -123,19 +131,16 @@ class AppointmentDetailScreen extends StatelessWidget {
                 title: 'Thông tin khám',
                 children: [
                   _DetailRow(
-                    icon: Icons.room_rounded,
-                    label: 'Phòng',
-                    value: 'Phòng 203, Tầng 2',
-                  ),
-                  _DetailRow(
                     icon: Icons.access_time_rounded,
-                    label: 'Giờ hẹn',
-                    value: '09:00 SA',
+                    label: 'Thời gian',
+                    value: _formatAppointmentDate(appointment.appointmentDate),
                   ),
                   _DetailRow(
                     icon: Icons.note_rounded,
                     label: 'Ghi chú',
-                    value: 'Nhịn ăn từ 10 giờ đêm hôm trước',
+                    value: appointment.notes?.isNotEmpty == true
+                        ? appointment.notes!
+                        : 'Không có ghi chú',
                   ),
                 ],
               ),
@@ -184,36 +189,50 @@ class AppointmentDetailScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 32),
-
-              // Actions
+              // Mark appointment as done button
               ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.directions_rounded, size: 22),
-                label: const Text('Chỉ đường đến bệnh viện'),
+                onPressed: () {
+                  SocketService.emitAppointmentDone(appointment.id);
+                },
+                icon: const Icon(Icons.check_circle, size: 22),
+                label: const Text('Xác nhận đã đến nơi'),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 60),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  textStyle:
-                      const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.phone_rounded, size: 22),
-                label: const Text('Gọi cho bệnh viện'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: const BorderSide(color: AppTheme.primary),
-                  minimumSize: const Size(double.infinity, 60),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
-                  textStyle:
-                      const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 24),
+
+              // Actions
+              // ElevatedButton.icon(
+              //   onPressed: () {},
+              //   icon: const Icon(Icons.directions_rounded, size: 22),
+              //   label: const Text('Chỉ đường đến bệnh viện'),
+              //   style: ElevatedButton.styleFrom(
+              //     minimumSize: const Size(double.infinity, 60),
+              //     shape: RoundedRectangleBorder(
+              //         borderRadius: BorderRadius.circular(16)),
+              //     textStyle:
+              //         const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              //   ),
+              // ),
+              // const SizedBox(height: 12),
+              // OutlinedButton.icon(
+              //   onPressed: () {},
+              //   icon: const Icon(Icons.phone_rounded, size: 22),
+              //   label: const Text('Gọi cho bệnh viện'),
+              //   style: OutlinedButton.styleFrom(
+              //     foregroundColor: AppTheme.primary,
+              //     side: const BorderSide(color: AppTheme.primary),
+              //     minimumSize: const Size(double.infinity, 60),
+              //     shape: RoundedRectangleBorder(
+              //         borderRadius: BorderRadius.circular(16)),
+              //     textStyle:
+              //         const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+              //   ),
+              // ),
+              // const SizedBox(height: 24),
             ],
           ),
         ),

@@ -5,6 +5,7 @@ using HealthTrackingService.Data;
 using HealthTrackingService.Models;
 using HealthTrackingService.Models.DTOs;
 using HealthTrackingService.Services;
+using OfficeOpenXml;
 
 namespace HealthTrackingService.Controllers;
 
@@ -191,6 +192,154 @@ public class HealthLogsController : ControllerBase
 
         _logger.LogInformation("Health log with ID {HealthLogId} deleted successfully", id);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Import health logs from Excel file
+    /// </summary>
+    /// <param name="userId">User ID to import health logs for</param>
+    /// <param name="file">Excel file containing health log data</param>
+    /// <returns>Import result</returns>
+    /// <response code="200">Returns import result</response>
+    /// <response code="400">If the file is invalid</response>
+    [HttpPost("import/{userId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ImportFromExcel(Guid userId, IFormFile file)
+    {
+        _logger.LogInformation("Importing health logs from Excel for user {UserId}", userId);
+
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { message = "No file uploaded" });
+        }
+
+        if (!file.FileName.EndsWith(".xlsx") && !file.FileName.EndsWith(".xls"))
+        {
+            return BadRequest(new { message = "File must be an Excel file (.xlsx or .xls)" });
+        }
+
+        try
+        {
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            
+            var importedCount = 0;
+            var errors = new List<string>();
+
+            using (var stream = new MemoryStream())
+            {
+                await file.CopyToAsync(stream);
+                using (var package = new ExcelPackage(stream))
+                {
+                    var worksheet = package.Workbook.Worksheets.FirstOrDefault();
+                    if (worksheet == null)
+                    {
+                        return BadRequest(new { message = "Excel file must contain at least one worksheet" });
+                    }
+
+                    var rowCount = worksheet.Dimension?.Rows ?? 0;
+                    if (rowCount < 2) // Header + at least 1 data row
+                    {
+                        return BadRequest(new { message = "Excel file must contain header row and at least one data row" });
+                    }
+
+                    // Expected columns: Date, Blood Pressure, Heart Rate, Weight, Note, Recorded By
+                    for (int row = 2; row <= rowCount; row++)
+                    {
+                        try
+                        {
+                            var dateStr = worksheet.Cells[row, 1].Value?.ToString()?.Trim();
+                            var bloodPressure = worksheet.Cells[row, 2].Value?.ToString()?.Trim();
+                            var heartRateStr = worksheet.Cells[row, 3].Value?.ToString()?.Trim();
+                            var weightStr = worksheet.Cells[row, 4].Value?.ToString()?.Trim();
+                            var note = worksheet.Cells[row, 5].Value?.ToString()?.Trim();
+                            var recordedBy = worksheet.Cells[row, 6].Value?.ToString()?.Trim();
+
+                            // Validate required fields
+                            if (!DateTime.TryParse(dateStr, out var date))
+                            {
+                                errors.Add($"Row {row}: Invalid date '{dateStr}'");
+                                continue;
+                            }
+
+                            // Validate blood pressure format (optional)
+                            if (!string.IsNullOrEmpty(bloodPressure) && bloodPressure != "-")
+                            {
+                                if (!bloodPressure.Contains('/'))
+                                {
+                                    errors.Add($"Row {row}: Blood pressure must be in format 'systolic/diastolic' (e.g., '120/80')");
+                                    continue;
+                                }
+                                
+                                var bpParts = bloodPressure.Split('/');
+                                if (bpParts.Length != 2 || 
+                                    !int.TryParse(bpParts[0], out _) || 
+                                    !int.TryParse(bpParts[1], out _))
+                                {
+                                    errors.Add($"Row {row}: Invalid blood pressure format '{bloodPressure}'");
+                                    continue;
+                                }
+                            }
+
+                            // Parse optional fields
+                            int? heartRate = null;
+                            if (!string.IsNullOrEmpty(heartRateStr) && int.TryParse(heartRateStr, out var hr))
+                            {
+                                heartRate = hr;
+                            }
+
+                            decimal? weight = null;
+                            if (!string.IsNullOrEmpty(weightStr) && decimal.TryParse(weightStr, out var w))
+                            {
+                                weight = (decimal?)w;
+                            }
+
+                            // Create health log
+                            var now = DateTime.UtcNow;
+                            var healthLog = new HealthLog
+                            {
+                                Id = Guid.NewGuid(),
+                                UserId = userId,
+                                Date = date,
+                                BloodPressure = string.IsNullOrEmpty(bloodPressure) ? "-" : bloodPressure,
+                                HeartRate = heartRate,
+                                Weight = (double?)weight,
+                                Note = note,
+                                RecordedBy = string.IsNullOrEmpty(recordedBy) ? "caregiver" : recordedBy,
+                                CreatedAt = now,
+                                UpdatedAt = now
+                            };
+
+                            _context.HealthLogs.Add(healthLog);
+                            await _context.SaveChangesAsync();
+
+                            // Fire-and-forget alert check
+                            _ = Task.Run(() => CheckAndNotifyAsync(healthLog));
+
+                            importedCount++;
+                            _logger.LogInformation("Imported health log for date: {Date} for user {UserId}", date, userId);
+                        }
+                        catch (Exception ex)
+                        {
+                            errors.Add($"Row {row}: {ex.Message}");
+                            _logger.LogError(ex, "Error importing health log at row {Row}", row);
+                        }
+                    }
+                }
+            }
+
+            return Ok(new 
+            { 
+                message = $"Quá trình nhập dữ liệu hoàn tất.",
+                importedCount,
+                errors = errors.Count > 0 ? errors : null
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error importing health logs from Excel");
+            return StatusCode(500, new { message = "Error importing health logs", detail = ex.Message });
+        }
     }
 
     // ─── Private helpers ─────────────────────────────────────────────────────

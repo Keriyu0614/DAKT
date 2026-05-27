@@ -1,4 +1,5 @@
-version: '3.8'
+name: dm-dakt  # <-- Đổi tên nhóm hiển thị trên Docker Desktop tách biệt hoàn toàn
+#version: '3.8'
 
 services:
   rabbitmq:
@@ -29,9 +30,25 @@ services:
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=Student_12345
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    networks:
+      - elderly-care-network
+
+  # ========================================================
+  # CONTAINER MỚI ĐƯỢC THÊM VÀO ĐÂY (Ví dụ: Công cụ xem DB)
+  # ========================================================
+  db-adminer:
+    image: adminer:latest
+    container_name: elderly-care-adminer
+    ports:
+      - "8080:8080"  # Bạn có thể vào http://localhost:8080 để quản lý SQL Server công khai
     networks:
       - elderly-care-network
 
 networks:
   elderly-care-network:
     driver: bridge
+
+volumes:
+  sqlserver-data:

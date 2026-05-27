@@ -46,6 +46,9 @@ const authApi = {
     createElderly: (data: { name: string; email: string; password: string; caregiverId: string }) => {
         return axiosClient.post<AuthResponse>("/api/auth/create-elderly", data);
     },
+    linkElderly: (data: { email: string; caregiverId: string }) => {
+        return axiosClient.post<AuthResponse>("/api/auth/link-elderly", data);
+    },
     getManagedElderly: (caregiverId: string) => {
         return axiosClient.get<any[]>(`/api/auth/managed-elderly/${caregiverId}`);
     },
@@ -67,6 +70,9 @@ const authApi = {
     },
     updateSettings: (userId: string, data: UserSettings) => {
         return axiosClient.put<UserSettings>(`/api/auth/settings/${userId}`, data);
+    },
+    changePassword: (userId: string, data: { currentPassword: string; newPassword: string }) => {
+        return axiosClient.post(`/api/auth/change-password/${userId}`, data);
     },
 };
 

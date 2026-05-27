@@ -21,18 +21,15 @@ export const reportApi = {
      * In a real system, this would be a single heavy backend query.
      * Here, we orchestrate it across existing clients.
      */
-    generateReport: async (range: TimeRange, customRange?: DateRange): Promise<ComprehensiveReport> => {
-        if (import.meta.env.DEV) {
-            return await reportMockService.generateMockReport(range);
-        }
+    generateReport: async (range: TimeRange, userId?: string, customRange?: DateRange): Promise<ComprehensiveReport> => {
         const { start, end } = reportApi.calculateDates(range, customRange);
 
         // Fetch all relevant data concurrently
         const [appts, meds, rems, notifs] = await Promise.all([
-            appointmentApi.getAll(),
-            medicationService.getMedications(), // Using service for consistency with Dashboard
-            reminderApi.getReminders(),
-            notificationApi.getNotifications("00000000-0000-0000-0000-000000000001", 1, 100) // Backend max is 100
+            appointmentApi.getAll(userId).catch(() => ({ data: [] })),
+            medicationService.getMedications(userId).catch(() => []), // Using service for consistency with Dashboard
+            reminderApi.getReminders(userId).catch(() => ({ data: [] })),
+            notificationApi.getNotifications(userId || "00000000-0000-0000-0000-000000000001", 1, 100).catch(() => ({ data: [] })) // Backend max is 100
         ]);
 
         // 1. Process Reminder Performance
@@ -152,7 +149,7 @@ export const reportApi = {
         const acknowledged = notifs.filter(n => n.status === 3 && n.sentAt >= start.toISOString()).length;
 
         return {
-            activeMedications: meds.filter(m => m.status === 'Active').length,
+            activeMedications: meds.filter(m => m.status?.toLowerCase() === 'active' || m.isActive === true).length,
             missedRemindersCount: missed,
             acknowledgedCount: acknowledged,
             pauseResumeHistoryCount: 0, // Meta-stat

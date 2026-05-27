@@ -1,28 +1,33 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import '../main.dart';
-//import '../widgets/reminder_card.dart';
 import 'appointment_detail_screen.dart';
 import 'health_detail_screen.dart';
 import 'notification_history_screen.dart';
 import 'medication_reminder_screen.dart';
 import 'appointment_reminder_screen.dart';
 import 'profile_screen.dart';
+import 'health_chat_screen.dart';
+import 'emergency_call_screen.dart';
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
 import '../services/reminder_service.dart';
 import '../services/health_service.dart';
 import '../services/appointment_service.dart';
 import '../services/medication_service.dart';
+import '../services/emergency_service.dart';
+import '../services/socket_service.dart';
 import '../models/reminder_model.dart';
 import '../models/health_log_model.dart';
 import '../models/appointment_model.dart';
 import '../models/medication_model.dart';
 import '../services/notification_service.dart';
+import '../services/local_notification_service.dart';
 import '../models/notification_model.dart';
 import '../services/socket_service.dart';
-import '../services/local_notification_service.dart';
+import 'package:flutter/material.dart';
 import '../widgets/reminder_card.dart' hide ReminderStatus;
 
 class HomeScreen extends StatefulWidget {
@@ -121,7 +126,6 @@ class _HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<_HomeTab> with RouteAware {
-  bool _medicationTaken = false;
   List<ReminderModel> _reminders = [];
   List<MedicationModel> _medications = [];
   List<AppointmentModel> _appointments = [];
@@ -131,12 +135,85 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   bool _hasUnreadNotifications = false;
   Timer? _foregroundTimer;
   final Set<String> _shownDialogReminderIds = {};
+  // Tracks snooze expiry per medication: medId → DateTime when snooze expires
+  final Map<String, DateTime> _snoozedUntil = {};
+  DateTime _selectedDate = DateTime.now();
+  int _calendarMonthOffset = 0;
 
   @override
   void initState() {
     super.initState();
+    dev.log('=== HomeScreen initState ===');
+    // Ensure socket is connected before setting up listeners
+    SocketService.connect();
+    // Wait a bit for connection to establish
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _setupSocketListeners();
+      dev.log('Socket connected: ${SocketService.isConnected}');
+    });
     _loadData();
     _startForegroundTimer();
+  }
+
+  void _setupSocketListeners() {
+    dev.log('=== Setting up socket listeners in HomeScreen ===');
+    // Listen for status updates
+    SocketService.on('status_updated', _handleStatusUpdate);
+    SocketService.on('notification_created', _handleNotificationCreated);
+    SocketService.on('medication_snoozed_event', _handleMedicationSnoozed);
+    SocketService.on('medication_missed', _handleMedicationMissed);
+    // Listen for delete events
+    SocketService.on('medication_deleted', _handleMedicationDeleted);
+    SocketService.on('appointment_deleted', _handleAppointmentDeleted);
+    dev.log('=== Socket listeners setup complete ===');
+  }
+
+  void _handleStatusUpdate(dynamic data) {
+    dev.log('🔔 Home: Received status_updated event, reloading data...');
+    dev.log('   Data: $data');
+    if (mounted) {
+      _loadData();
+    }
+  }
+
+  void _handleNotificationCreated(dynamic data) {
+    dev.log('🔔 Home: Received notification_created event, reloading data...');
+    dev.log('   Data: $data');
+    if (mounted) {
+      _loadData();
+    }
+  }
+
+  void _handleMedicationSnoozed(dynamic data) {
+    dev.log('🔔 Home: Received medication_snoozed_event, reloading data...');
+    dev.log('   Data: $data');
+    if (mounted) {
+      _loadData();
+    }
+  }
+
+  void _handleMedicationMissed(dynamic data) {
+    dev.log('🔔 Home: Received medication_missed event, reloading data...');
+    dev.log('   Data: $data');
+    if (mounted) {
+      _loadData();
+    }
+  }
+
+  void _handleMedicationDeleted(dynamic data) {
+    dev.log('🗑️ Home: Received medication_deleted event, reloading data...');
+    dev.log('   Data: $data');
+    if (mounted) {
+      _loadData();
+    }
+  }
+
+  void _handleAppointmentDeleted(dynamic data) {
+    dev.log('🗑️ Home: Received appointment_deleted event, reloading data...');
+    dev.log('   Data: $data');
+    if (mounted) {
+      _loadData();
+    }
   }
 
   @override
@@ -152,6 +229,14 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   void dispose() {
     routeObserver.unsubscribe(this);
     _foregroundTimer?.cancel();
+    // Unregister socket listeners
+    dev.log('Cleaning up socket listeners in HomeScreen');
+    SocketService.off('status_updated', _handleStatusUpdate);
+    SocketService.off('notification_created', _handleNotificationCreated);
+    SocketService.off('medication_snoozed_event', _handleMedicationSnoozed);
+    SocketService.off('medication_missed', _handleMedicationMissed);
+    SocketService.off('medication_deleted', _handleMedicationDeleted);
+    SocketService.off('appointment_deleted', _handleAppointmentDeleted);
     super.dispose();
   }
 
@@ -161,11 +246,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   }
 
   Future<void> _loadData() async {
+    dev.log('=== _loadData called ===');
     setState(() {
       _isLoading = true;
       _isError = false;
     });
     try {
+      dev.log('Fetching data from services...');
       final results = await Future.wait<dynamic>([
         ReminderService.getMyReminders(),
         HealthService.getMyHealthLogs(),
@@ -174,26 +261,56 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         AppointmentService.getMyAppointments(),
       ]);
 
+      dev.log('✅ Data fetched successfully');
+      dev.log('   Reminders: ${(results[0] as List).length}');
+      dev.log('   Health logs: ${(results[1] as List).length}');
+      dev.log('   Notifications: ${(results[2] as List).length}');
+      dev.log('   Medications: ${(results[3] as List).length}');
+      dev.log('   Appointments: ${(results[4] as List).length}');
+
+      // Debug: Log reminder details
+      final reminders = results[0] as List<ReminderModel>;
+      dev.log('=== REMINDER DETAILS ===');
+      for (final reminder in reminders) {
+        dev.log('Reminder ${reminder.id}: type=${reminder.type}, status=${reminder.status}, scheduledTime=${reminder.scheduledTime}, referenceId=${reminder.referenceId}');
+      }
+
+      // Debug: Log medication details
+      final medications = results[3] as List<MedicationModel>;
+      dev.log('=== MEDICATION DETAILS ===');
+      for (final medication in medications) {
+        dev.log('Medication ${medication.id}: name=${medication.medicationName}');
+      }
+
       setState(() {
         _reminders = results[0] as List<ReminderModel>;
         final logs = results[1] as List<HealthLogModel>;
         if (logs.isNotEmpty) {
           _latestHealthLog = logs.first;
         }
-        
-        final List<NotificationModel> notifications = List<NotificationModel>.from(results[2]);
-        _hasUnreadNotifications = notifications.any((n) => n.status != 'Read' && n.status != 'Acknowledged');
-        
+
+        final List<NotificationModel> notifications =
+            List<NotificationModel>.from(results[2]);
+        _hasUnreadNotifications = notifications
+            .any((n) => n.status != 'Read' && n.status != 'Acknowledged');
+
         _medications = results[3] as List<MedicationModel>;
         _appointments = results[4] as List<AppointmentModel>;
-        
+
         _isLoading = false;
       });
 
-      // Pre-schedule local notifications for today's medication reminders
-      _scheduleNotifications();
+      dev.log('Scheduling daily reminders...');
+      LocalNotificationService.scheduleDailyReminders(
+        _reminders.map((r) => r.toJson()).toList(),
+        _medications.map((m) => m.toJson()).toList(),
+        _appointments.map((a) => a.toJson()).toList(),
+      ).catchError((error) {
+        dev.log('❌ Notification schedule error: $error');
+      });
+      dev.log('=== _loadData complete ===');
     } catch (e) {
-      print('Error loading data: $e');
+      dev.log('❌ Error loading data: $e');
       setState(() {
         _isLoading = false;
         _isError = true;
@@ -201,28 +318,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     }
   }
 
-  void _scheduleNotifications() {
-    try {
-      final reminderJsonList = _reminders.map((r) => r.toJson()).toList();
-      final medJsonList = _medications.map((m) => m.toJson()).toList();
-      // Adapt medication JSON keys for the notification service
-      final adaptedMedJsonList = medJsonList.map((m) => {
-        'id': m['id'],
-        'name': m['medicationName'],
-        'dosage': {'amount': m['dosage'], 'unit': ''},
-      }).toList();
-      LocalNotificationService.scheduleDailyReminders(reminderJsonList, adaptedMedJsonList);
-    } catch (e) {
-      print('Error scheduling notifications: $e');
-    }
-  }
-
   void _startForegroundTimer() {
-    _foregroundTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+    // Check every 10 seconds for more responsive alarm triggering
+    _foregroundTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       _checkForDueMedication();
     });
-    // Also check immediately
-    Future.delayed(const Duration(seconds: 3), () {
+    // Initial check after 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
       _checkForDueMedication();
     });
   }
@@ -231,131 +333,160 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     if (!mounted) return;
     final now = DateTime.now();
 
+    dev.log('Checking for due medications. Total medications: ${_medications.length}');
+
+    // Check medication bằng cách duyệt trực tiếp _medications + scheduledTimes
+    // Không phụ thuộc vào _reminders để tránh trường hợp reminder chưa được tạo
+    for (final med in _medications) {
+      // Kiểm tra thuốc có hiệu lực hôm nay không
+      final today = DateTime(now.year, now.month, now.day);
+      final startDay = DateTime(med.startDate.year, med.startDate.month, med.startDate.day);
+      if (today.isBefore(startDay)) continue;
+      if (med.endDate != null) {
+        final endDay = DateTime(med.endDate!.year, med.endDate!.month, med.endDate!.day);
+        if (today.isAfter(endDay)) continue;
+      }
+
+      // Kiểm tra nếu thuốc đang trong thời gian snooze
+      if (_snoozedUntil.containsKey(med.id)) {
+        final snoozeUntil = _snoozedUntil[med.id]!;
+        if (now.isBefore(snoozeUntil)) {
+          dev.log('Med ${med.medicationName} snoozed until $snoozeUntil, skipping');
+          continue; // Bỏ qua thuốc này, chưa đến lúc nhắc lại
+        } else {
+          // Snooze đã hết hạn: xóa tracking và cho phép alarm hiện lại
+          _snoozedUntil.remove(med.id);
+          // Xóa các dialogKey cũ của thuốc này để alarm có thể hiện lại
+          _shownDialogReminderIds.removeWhere((key) => key.startsWith('${med.id}_'));
+          dev.log('Snooze expired for ${med.medicationName}, re-enabling alarm');
+        }
+      }
+
+      // Parse scheduledTimes (hỗ trợ cả "HH:mm" và "12/30/1899 H:mm:ss AM/PM")
+      final times = med.scheduledTimes.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty);
+      for (final timeStr in times) {
+        int h = 0, m = 0;
+        final oaMatch = RegExp(r'(\d{1,2}):(\d{2}):\d{2}\s*(AM|PM)', caseSensitive: false).firstMatch(timeStr);
+        if (oaMatch != null) {
+          h = int.tryParse(oaMatch.group(1)!) ?? 0;
+          m = int.tryParse(oaMatch.group(2)!) ?? 0;
+          final ampm = oaMatch.group(3)!.toUpperCase();
+          if (ampm == 'PM' && h != 12) h += 12;
+          if (ampm == 'AM' && h == 12) h = 0;
+        } else {
+          final parts = timeStr.split(':');
+          if (parts.length < 2) continue;
+          h = int.tryParse(parts[0]) ?? 0;
+          m = int.tryParse(parts[1]) ?? 0;
+        }
+
+        // Tìm reminder tương ứng nếu có (cho phép lệch dưới 30 phút để hỗ trợ các lịch uống đã được hoãn)
+        final ReminderModel? reminder = _reminders.cast<ReminderModel?>().firstWhere(
+          (r) {
+            if (r == null || r.type != ReminderType.medication) return false;
+            if (r.referenceId != med.id) return false;
+            final rt = r.scheduledTime.toLocal();
+            if (rt.year != now.year || rt.month != now.month || rt.day != now.day) return false;
+            final diff = (rt.hour * 60 + rt.minute - (h * 60 + m)).abs();
+            return diff < 30;
+          },
+          orElse: () => null,
+        );
+
+        // Nếu tìm thấy reminder nhưng trạng thái đã là Đã uống (done) hoặc Bỏ lỡ (missed), bỏ qua không hiện chuông báo
+        if (reminder != null && reminder.status != ReminderStatus.pending) {
+          dev.log('Med ${med.medicationName} is not pending (status: ${reminder.status}), skipping alarm');
+          continue;
+        }
+
+        final targetTime = reminder?.scheduledTime.toLocal() ?? DateTime(now.year, now.month, now.day, h, m);
+        final diffSeconds = now.difference(targetTime).inSeconds;
+        final diffMinutes = now.difference(targetTime).inMinutes;
+
+        // Key duy nhất cho mỗi lần uống thuốc thực tế trong ngày
+        final actualHour = targetTime.hour;
+        final actualMinute = targetTime.minute;
+        final dialogKey = '${med.id}_${actualHour}_${actualMinute}_${now.day}${now.month}${now.year}';
+
+        dev.log('Med ${med.medicationName} at $actualHour:$actualMinute → diffSeconds=$diffSeconds, shown=${_shownDialogReminderIds.contains(dialogKey)}');
+
+        if (diffSeconds >= 0 && diffMinutes <= 15 && !_shownDialogReminderIds.contains(dialogKey)) {
+          dev.log('Showing medication alarm: ${med.medicationName} at $actualHour:$actualMinute');
+
+          final actualReminder = reminder ?? ReminderModel(
+            id: dialogKey,
+            userId: med.userId,
+            type: ReminderType.medication,
+            referenceId: med.id,
+            scheduledTime: targetTime,
+            status: ReminderStatus.pending,
+          );
+
+          _shownDialogReminderIds.add(dialogKey);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MedicationReminderScreen(
+                reminder: actualReminder,
+                medication: med,
+              ),
+            ),
+          ).then((result) {
+            if (mounted) {
+              if (result == 'snoozed') {
+                // Giữ dialogKey trong _shownDialogReminderIds để tránh trigger liên tục
+                // Thay vào đó track thời gian snooze hết hạn (5 phút)
+                final snoozeExpiry = DateTime.now().add(const Duration(minutes: 5));
+                _snoozedUntil[med.id] = snoozeExpiry;
+                dev.log('Snooze: med ${med.medicationName} snoozed until $snoozeExpiry');
+              }
+              _loadData();
+            }
+          });
+          return; // Chỉ show 1 alarm tại một thời điểm
+        }
+      }
+    }
+
     for (final reminder in _reminders) {
-      if (reminder.type != ReminderType.medication) continue;
+      if (reminder.type != ReminderType.appointment) continue;
       if (reminder.status != ReminderStatus.pending) continue;
       if (_shownDialogReminderIds.contains(reminder.id)) continue;
 
+      // Skip if appointment was deleted
+      final appointmentExists = _appointments.any((a) => a.id == reminder.referenceId);
+      if (!appointmentExists) {
+        dev.log('Skipping appointment reminder ${reminder.id}: appointment not found (deleted)');
+        continue;
+      }
+
       final localTime = reminder.scheduledTime.toLocal();
       final diffMinutes = now.difference(localTime).inMinutes;
+      final diffSeconds = now.difference(localTime).inSeconds;
 
-      // Show dialog if due (within -1 to +15 minutes window)
-      if (diffMinutes >= -1 && diffMinutes <= 15) {
-        final medication = _medications.firstWhere(
-          (m) => m.id == reminder.referenceId,
-          orElse: () => MedicationModel(
-            id: '', userId: '',
-            medicationName: 'Thuốc',
-            dosage: '', frequency: '',
-            scheduledTimes: '',
-            startDate: DateTime.now(),
-          ),
+      dev.log('Appointment reminder ${reminder.id}: diffSeconds=$diffSeconds, diffMinutes=$diffMinutes, scheduledTime=$localTime');
+
+      // Show alarm only when time has arrived (0 seconds or after) and within 15 minutes
+      if (diffSeconds >= 0 && diffMinutes <= 15) {
+        dev.log('Showing appointment reminder: ${reminder.id}');
+        final appointment = _appointments.firstWhere(
+          (a) => a.id == reminder.referenceId,
         );
         _shownDialogReminderIds.add(reminder.id);
-        _showMedicationDialog(reminder, medication);
-        break; // Show one at a time
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AppointmentReminderScreen(
+              reminder: reminder,
+              appointment: appointment,
+            ),
+          ),
+        ).then((_) {
+          if (mounted) _loadData();
+        });
+        break;
       }
     }
-  }
-
-  void _showMedicationDialog(ReminderModel reminder, MedicationModel medication) {
-    if (!mounted) return;
-    final localTime = reminder.scheduledTime.toLocal();
-    final timeStr = '${localTime.hour.toString().padLeft(2, '0')}:${localTime.minute.toString().padLeft(2, '0')}';
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.medication_rounded, color: AppTheme.primary, size: 28),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Text('Đến giờ uống thuốc!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _dialogInfoRow('Thuốc:', medication.medicationName),
-            const SizedBox(height: 8),
-            _dialogInfoRow('Liều lượng:', medication.dosage),
-            const SizedBox(height: 8),
-            _dialogInfoRow('Thời gian:', timeStr),
-            if (medication.instructions != null && medication.instructions!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              _dialogInfoRow('Ghi chú:', medication.instructions!),
-            ],
-          ],
-        ),
-        actionsAlignment: MainAxisAlignment.spaceEvenly,
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              // Snooze: re-trigger the dialog after 5 minutes
-              _shownDialogReminderIds.remove(reminder.id);
-              Timer(const Duration(minutes: 5), () {
-                if (mounted) {
-                  _showMedicationDialog(reminder, medication);
-                }
-              });
-            },
-            child: const Text('Nhắc lại sau', style: TextStyle(color: AppTheme.warning, fontWeight: FontWeight.w700, fontSize: 16)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              SocketService.emitMedicationTaken(reminder.id);
-              setState(() {
-                _reminders = _reminders.map((r) {
-                  if (r.id == reminder.id) {
-                    return ReminderModel(
-                      id: r.id, userId: r.userId, type: r.type,
-                      referenceId: r.referenceId,
-                      scheduledTime: r.scheduledTime,
-                      status: ReminderStatus.done,
-                    );
-                  }
-                  return r;
-                }).toList();
-              });
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.secondary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Đã uống xong', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _dialogInfoRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 90,
-          child: Text(label, style: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
-        ),
-        Expanded(
-          child: Text(value, style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-        ),
-      ],
-    );
   }
 
   @override
@@ -366,9 +497,15 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _buildHeader(context)),
-            SliverToBoxAdapter(child: _buildMedicationButton()),
-            SliverToBoxAdapter(child: _buildSectionTitle('📅 Việc cần làm hôm nay')),
+            SliverToBoxAdapter(child: _buildGreeting()),
+            SliverToBoxAdapter(
+                child: _buildSectionTitle(
+                  _isToday(_selectedDate)
+                    ? '📅 Việc cần làm hôm nay'
+                    : '📅 Việc ngày ${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                )),
             _buildTodayTasksSection(context),
+            SliverToBoxAdapter(child: _buildMonthCalendar()),
             SliverToBoxAdapter(child: _buildSectionTitle('Chỉ số sức khoẻ')),
             SliverToBoxAdapter(child: _buildHealthCard(context)),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -385,9 +522,15 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
       color: AppTheme.card,
       child: Row(
         children: [
-          // Nút gọi hỗ trợ
           GestureDetector(
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const EmergencyCallScreen(),
+                ),
+              );
+            },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
@@ -414,7 +557,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
             ),
           ),
           const Spacer(),
-          // Chuông thông báo
+          // Logo CareLink ở giữa header
+          // 
+          const Spacer(),
           Stack(
             children: [
               GestureDetector(
@@ -424,7 +569,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                     MaterialPageRoute(
                         builder: (_) => const NotificationHistoryScreen()),
                   );
-                  _loadData(); // Refresh unread status when returning
+                  _loadData();
                 },
                 child: const Icon(Icons.notifications_none_rounded,
                     color: AppTheme.textPrimary, size: 28),
@@ -445,20 +590,21 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
             ],
           ),
           const SizedBox(width: 16),
-          // Avatar
           GestureDetector(
-            onTap: () {
-              // Optional: navigate to profile
-            },
+            onTap: () {},
             child: CircleAvatar(
               radius: 20,
               backgroundColor: AppTheme.primaryLight,
               backgroundImage: AuthService.currentUser?.avatarUrl != null
-                  ? NetworkImage('${ApiService.serverUrl}${AuthService.currentUser!.avatarUrl}')
+                  ? NetworkImage(
+                      '${ApiService.serverUrl}${AuthService.currentUser!.avatarUrl}')
                   : null,
               child: AuthService.currentUser?.avatarUrl == null
                   ? Text(
-                      AuthService.currentUser?.name?.substring(0, 1).toUpperCase() ?? 'K',
+                      AuthService.currentUser?.name
+                              ?.substring(0, 1)
+                              .toUpperCase() ??
+                          'K',
                       style: const TextStyle(
                         color: AppTheme.primary,
                         fontWeight: FontWeight.w800,
@@ -473,14 +619,13 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     );
   }
 
-  // ── GREETING + NÚT UỐNG THUỐC ──
-  Widget _buildMedicationButton() {
+  // ── GREETING ──
+  Widget _buildGreeting() {
     return Container(
       color: AppTheme.card,
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       child: Column(
         children: [
-          // Chào
           Text(
             'CHÀO ${AuthService.currentUser?.name?.toUpperCase() ?? 'BẠN'}',
             style: const TextStyle(
@@ -491,7 +636,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
             ),
           ),
           const SizedBox(height: 8),
-          // Ngày
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
             decoration: BoxDecoration(
@@ -508,55 +652,283 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          // Nút uống thuốc
+          const SizedBox(height: 16),
+          // AI Chat Button
           GestureDetector(
-            onTap: () => setState(() => _medicationTaken = !_medicationTaken),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 20),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HealthChatScreen(),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _medicationTaken
-                      ? [const Color(0xFF10B981), const Color(0xFF059669)]
-                      : [const Color(0xFF38BDF8), const Color(0xFF2563EB)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: (_medicationTaken
-                            ? AppTheme.secondary
-                            : AppTheme.primary)
-                        .withOpacity(0.35),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
+                    color: const Color(0xFF6366F1).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _medicationTaken
-                        ? Icons.check_circle_rounded
-                        : Icons.check_circle_outline_rounded,
-                    color: Colors.white,
-                    size: 32,
-                  ),
-                  const SizedBox(width: 12),
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.psychology_rounded, color: Colors.white, size: 22),
+                  SizedBox(width: 10),
                   Text(
-                    _medicationTaken ? 'Đã uống thuốc ✓' : 'Tôi đã uống thuốc',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
+                    'Tư vấn Sức khỏe AI',
+                    style: TextStyle(
+                      fontSize: 15,
                       fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
                     ),
                   ),
+                  SizedBox(width: 6),
+                  Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── HELPERS ──
+  bool _isToday(DateTime d) {
+    final now = DateTime.now();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  bool _dayHasMed(DateTime day) {
+    final d = DateTime(day.year, day.month, day.day);
+    return _medications.any((med) {
+      final start = DateTime(med.startDate.year, med.startDate.month, med.startDate.day);
+      if (d.isBefore(start)) return false;
+      if (med.endDate != null) {
+        final end = DateTime(med.endDate!.year, med.endDate!.month, med.endDate!.day);
+        if (d.isAfter(end)) return false;
+      }
+      return true;
+    });
+  }
+
+  bool _dayHasApt(DateTime day) {
+    return _appointments.any((apt) => _isSameDay(apt.appointmentDate.toLocal(), day));
+  }
+
+  // ── MONTH CALENDAR ──
+  Widget _buildMonthCalendar() {
+    final now = DateTime.now();
+    final displayMonth = DateTime(now.year, now.month + _calendarMonthOffset, 1);
+    final firstDay = DateTime(displayMonth.year, displayMonth.month, 1);
+    final lastDay = DateTime(displayMonth.year, displayMonth.month + 1, 0);
+
+    // Build grid: start from Monday
+    final startWeekday = firstDay.weekday; // 1=Mon..7=Sun
+    final leadingDays = startWeekday - 1;
+
+    final List<DateTime?> cells = [];
+    for (int i = 0; i < leadingDays; i++) cells.add(null);
+    for (int d = 1; d <= lastDay.day; d++) {
+      cells.add(DateTime(displayMonth.year, displayMonth.month, d));
+    }
+    // Pad to complete last row
+    while (cells.length % 7 != 0) cells.add(null);
+
+    const dayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      decoration: BoxDecoration(
+        color: AppTheme.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Month navigation
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                GestureDetector(
+                  onTap: () => setState(() => _calendarMonthOffset--),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.chevron_left_rounded,
+                        size: 20, color: AppTheme.textSecondary),
+                  ),
+                ),
+                Text(
+                  'Tháng ${displayMonth.month} / ${displayMonth.year}',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _calendarMonthOffset++),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.chevron_right_rounded,
+                        size: 20, color: AppTheme.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Day-of-week headers
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: dayLabels.map((label) => Expanded(
+                child: Center(
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textMuted,
+                    ),
+                  ),
+                ),
+              )).toList(),
+            ),
+          ),
+          const SizedBox(height: 4),
+          // Calendar grid
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+            child: Column(
+              children: List.generate(cells.length ~/ 7, (rowIdx) {
+                return Row(
+                  children: List.generate(7, (colIdx) {
+                    final cell = cells[rowIdx * 7 + colIdx];
+                    if (cell == null) return const Expanded(child: SizedBox(height: 44));
+
+                    final isSelected = _isSameDay(cell, _selectedDate);
+                    final isToday = _isToday(cell);
+                    final hasMed = _dayHasMed(cell);
+                    final hasApt = _dayHasApt(cell);
+                    final isCurrentMonth = cell.month == displayMonth.month;
+
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedDate = cell),
+                        child: Container(
+                          height: 44,
+                          margin: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppTheme.primary
+                                : isToday
+                                    ? AppTheme.primaryLight
+                                    : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                            border: isToday && !isSelected
+                                ? Border.all(color: AppTheme.primary, width: 1.5)
+                                : null,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '${cell.day}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: isSelected || isToday
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : isCurrentMonth
+                                          ? AppTheme.textPrimary
+                                          : AppTheme.textMuted,
+                                ),
+                              ),
+                              if ((hasMed || hasApt) && !isSelected)
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (hasMed)
+                                      Container(
+                                        width: 5,
+                                        height: 5,
+                                        margin: const EdgeInsets.only(top: 2, right: 1),
+                                        decoration: const BoxDecoration(
+                                          color: AppTheme.primary,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    if (hasApt)
+                                      Container(
+                                        width: 5,
+                                        height: 5,
+                                        margin: const EdgeInsets.only(top: 2, left: 1),
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFF8B5CF6),
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              }),
+            ),
+          ),
+          // Legend
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Row(
+              children: [
+                Container(width: 8, height: 8,
+                  decoration: const BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle)),
+                const SizedBox(width: 4),
+                const Text('Uống thuốc', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                const SizedBox(width: 12),
+                Container(width: 8, height: 8,
+                  decoration: const BoxDecoration(color: Color(0xFF8B5CF6), shape: BoxShape.circle)),
+                const SizedBox(width: 4),
+                const Text('Lịch khám', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+              ],
             ),
           ),
         ],
@@ -620,7 +992,10 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                   ),
                   child: const Text(
                     'Thử lại',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white),
                   ),
                 ),
               ],
@@ -631,20 +1006,203 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     }
 
     final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    // Use selected date for filtering, fall back to today
+    final sel = _selectedDate;
+    final selStart = DateTime(sel.year, sel.month, sel.day);
+    final selEnd = DateTime(sel.year, sel.month, sel.day, 23, 59, 59);
+
+    dev.log('=== FILTERING TASKS FOR ${sel.day}/${sel.month}/${sel.year} ===');
+    dev.log('Total reminders: ${_reminders.length}');
+    dev.log('Total medications: ${_medications.length}');
+    dev.log('Total appointments: ${_appointments.length}');
 
     final todayReminders = _reminders.where((r) {
       final localTime = r.scheduledTime.toLocal();
-      return localTime.isAfter(todayStart.subtract(const Duration(seconds: 1))) &&
-             localTime.isBefore(todayEnd.add(const Duration(seconds: 1))) &&
-             r.status != ReminderStatus.done;
+      final isOnDay = localTime.isAfter(
+              selStart.subtract(const Duration(seconds: 1))) &&
+          localTime.isBefore(selEnd.add(const Duration(seconds: 1))) &&
+          r.status != ReminderStatus.done;
+
+      dev.log('Checking reminder ${r.id}: type=${r.type}, isOnDay=$isOnDay, status=${r.status}, scheduledTime=${r.scheduledTime}');
+
+      if (!isOnDay) return false;
+
+      // Filter out reminders without corresponding medication/appointment
+      if (r.type == ReminderType.medication) {
+        final hasMatchingMedication = _medications.any((m) => m.id == r.referenceId);
+        dev.log('Medication reminder ${r.id}: referenceId=${r.referenceId}, hasMatchingMedication=$hasMatchingMedication');
+        if (!hasMatchingMedication) {
+          dev.log('Available medication IDs: ${_medications.map((m) => m.id).toList()}');
+        }
+        return hasMatchingMedication;
+      } else if (r.type == ReminderType.appointment) {
+        final hasMatchingAppointment = _appointments.any((a) => a.id == r.referenceId);
+        dev.log('Appointment reminder ${r.id}: referenceId=${r.referenceId}, hasMatchingAppointment=$hasMatchingAppointment');
+        return hasMatchingAppointment;
+      }
+
+      return true;
     }).toList();
 
-    // Sort ascending
+    // Sort by time: ascending order
     todayReminders.sort((a, b) => a.scheduledTime.compareTo(b.scheduledTime));
 
-    if (todayReminders.isEmpty) {
+    dev.log('=== FILTERED RESULTS ===');
+    dev.log('Today\'s reminders count: ${todayReminders.length}');
+    for (final reminder in todayReminders) {
+      dev.log('Today reminder: ${reminder.id} (${reminder.type}) - ${reminder.scheduledTime}');
+    }
+
+    // Medications active on selected date (by startDate/endDate) shown regardless of reminders
+    final today = selStart;
+    final todayMeds = _medications.where((med) {
+      final startDay = DateTime(med.startDate.year, med.startDate.month, med.startDate.day);
+      if (today.isBefore(startDay)) return false;
+      if (med.endDate != null) {
+        final endDay = DateTime(med.endDate!.year, med.endDate!.month, med.endDate!.day);
+        if (today.isAfter(endDay)) return false;
+      }
+      return true;
+    }).toList();
+
+    // Build medication items from scheduledTimes (for meds active today)
+    final List<Widget> medItems = [];
+    for (final med in todayMeds) {
+      final times = med.scheduledTimes
+          .split(',')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+      for (final timeStr in times) {
+        // Parse cả format "HH:mm" lẫn "12/30/1899 H:mm:ss AM/PM" (OADate từ Excel)
+        int h = 0, m = 0;
+        final oaMatch = RegExp(r'(\d{1,2}):(\d{2}):\d{2}\s*(AM|PM)', caseSensitive: false).firstMatch(timeStr);
+        if (oaMatch != null) {
+          h = int.tryParse(oaMatch.group(1)!) ?? 0;
+          m = int.tryParse(oaMatch.group(2)!) ?? 0;
+          final ampm = oaMatch.group(3)!.toUpperCase();
+          if (ampm == 'PM' && h != 12) h += 12;
+          if (ampm == 'AM' && h == 12) h = 0;
+        } else {
+          final parts = timeStr.split(':');
+          if (parts.length < 2) continue;
+          h = int.tryParse(parts[0]) ?? 0;
+          m = int.tryParse(parts[1]) ?? 0;
+        }
+        // Find matching reminder for status (allow up to 30 mins difference to handle snoozed times)
+        final matchingReminder = _reminders.cast<ReminderModel?>().firstWhere(
+          (r) {
+            if (r == null || r.type != ReminderType.medication) return false;
+            if (r.referenceId != med.id) return false;
+            final rt = r.scheduledTime.toLocal();
+            if (rt.year != sel.year || rt.month != sel.month || rt.day != sel.day) return false;
+            final diffMinutes = (rt.hour * 60 + rt.minute - (h * 60 + m)).abs();
+            return diffMinutes < 30;
+          },
+          orElse: () => null,
+        );
+
+        // Skip if already done
+        if (matchingReminder?.status == ReminderStatus.done) continue;
+
+        // Use actual reminder time if available, otherwise use static slot time
+        String displayTime;
+        if (matchingReminder != null) {
+          final rt = matchingReminder.scheduledTime.toLocal();
+          final rHour = rt.hour;
+          final rMinute = rt.minute;
+          final rHour12 = rHour == 0 ? 12 : (rHour > 12 ? rHour - 12 : rHour);
+          final rAmpm = rHour >= 12 ? 'CH' : 'SA';
+          displayTime = '${rHour12.toString().padLeft(2, '0')}:${rMinute.toString().padLeft(2, '0')} $rAmpm';
+        } else {
+          final hour12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+          final ampm = h >= 12 ? 'CH' : 'SA';
+          displayTime = '${hour12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $ampm';
+        }
+
+        medItems.add(Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _TodayTaskItem(
+            icon: Icons.medication_rounded,
+            iconColor: AppTheme.primary,
+            title: med.medicationName,
+            time: displayTime,
+            extraInfo: med.dosage,
+            onTap: () {
+              // Tìm reminder khớp, nếu không có thì tạo placeholder
+              final ReminderModel reminder = matchingReminder ?? ReminderModel(
+                id: '${med.id}_${h}_${m}',
+                userId: med.userId,
+                type: ReminderType.medication,
+                referenceId: med.id,
+                scheduledTime: DateTime(sel.year, sel.month, sel.day, h, m),
+                status: ReminderStatus.pending,
+              );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MedicationReminderScreen(
+                    reminder: reminder,
+                    medication: med,
+                  ),
+                ),
+              ).then((_) => _loadData());
+            },
+          ),
+        ));
+      }
+    }
+
+    // Appointments on selected date — filter directly from _appointments by date
+    final todayApts = _appointments.where((apt) {
+      final aptDay = DateTime(apt.appointmentDate.toLocal().year, apt.appointmentDate.toLocal().month, apt.appointmentDate.toLocal().day);
+      return aptDay == selStart;
+    }).toList();
+
+    final List<Widget> apptItems = todayApts.map((apt) {
+      final local = apt.appointmentDate.toLocal();
+      final h = local.hour;
+      final m = local.minute;
+      final hour12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+      final ampm = h >= 12 ? 'CH' : 'SA';
+      final timeStr = '${hour12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $ampm';
+
+      // Find matching reminder if available
+      final matchingReminder = _reminders.cast<ReminderModel?>().firstWhere(
+        (r) => r != null && r.type == ReminderType.appointment && r.referenceId == apt.id,
+        orElse: () => null,
+      );
+
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _TodayTaskItem(
+          icon: Icons.calendar_month_rounded,
+          iconColor: const Color(0xFF8B5CF6),
+          title: apt.doctorName.startsWith('Khám')
+              ? apt.doctorName
+              : 'Khám bác sĩ ${apt.doctorName}',
+          time: timeStr,
+          extraInfo: apt.location,
+          onTap: matchingReminder != null
+              ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AppointmentReminderScreen(
+                        reminder: matchingReminder,
+                        appointment: apt,
+                      ),
+                    ),
+                  );
+                }
+              : null,
+        ),
+      );
+    }).toList();
+
+    final allItems = [...medItems, ...apptItems];
+
+    if (allItems.isEmpty) {
       return const SliverToBoxAdapter(
         child: Center(
           child: Padding(
@@ -665,82 +1223,7 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
     return SliverToBoxAdapter(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          children: todayReminders.map((reminder) {
-            final localTime = reminder.scheduledTime.toLocal();
-            final timeStr = '${localTime.hour.toString().padLeft(2, '0')}:${localTime.minute.toString().padLeft(2, '0')}';
-            
-            if (reminder.type == ReminderType.medication) {
-              // Find medication details
-              final medication = _medications.firstWhere(
-                (m) => m.id == reminder.referenceId,
-                orElse: () => MedicationModel(
-                  id: '',
-                  userId: '',
-                  medicationName: 'Uống thuốc',
-                  dosage: 'Đến giờ uống thuốc',
-                  frequency: '',
-                  scheduledTimes: '',
-                  startDate: DateTime.now(),
-                ),
-              );
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _TodayTaskItem(
-                  icon: Icons.medication_rounded,
-                  iconColor: AppTheme.primary,
-                  title: medication.medicationName,
-                  time: timeStr,
-                  extraInfo: medication.dosage,
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => MedicationReminderScreen(
-                          reminder: reminder,
-                          medication: medication,
-                        ),
-                      ),
-                    );
-                    _loadData();
-                  },
-                ),
-              );
-            } else {
-              // Find appointment details
-              final appointment = _appointments.firstWhere(
-                (a) => a.id == reminder.referenceId,
-                orElse: () => AppointmentModel(
-                  id: '',
-                  userId: '',
-                  doctorName: 'Lịch khám',
-                  location: 'Xem chi tiết lịch hẹn',
-                  appointmentDate: DateTime.now(),
-                ),
-              );
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _TodayTaskItem(
-                  icon: Icons.calendar_month_rounded,
-                  iconColor: const Color(0xFF8B5CF6),
-                  title: appointment.doctorName.startsWith('Khám') 
-                      ? appointment.doctorName 
-                      : 'Khám bác sĩ ${appointment.doctorName}',
-                  time: timeStr,
-                  extraInfo: appointment.location,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AppointmentReminderScreen()),
-                    );
-                  },
-                ),
-              );
-            }
-          }).toList(),
-        ),
+        child: Column(children: allItems),
       ),
     );
   }
@@ -769,7 +1252,6 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
           ),
           child: Row(
             children: [
-              // Ảnh máy đo huyết áp
               ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20),
@@ -803,9 +1285,9 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _latestHealthLog != null 
-                          ? 'Lần đo gần nhất: ${_latestHealthLog!.date?.day}/${_latestHealthLog!.date?.month}'
-                          : 'Chưa có dữ liệu đo',
+                        _latestHealthLog != null
+                            ? 'Lần đo gần nhất: ${_latestHealthLog!.date?.day}/${_latestHealthLog!.date?.month}'
+                            : 'Chưa có dữ liệu đo',
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppTheme.textSecondary,
@@ -818,9 +1300,10 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
                               color: AppTheme.secondary, size: 16),
                           const SizedBox(width: 4),
                           Text(
-                            _latestHealthLog != null && _latestHealthLog!.bloodPressure != null
-                              ? 'Ổn định (${_latestHealthLog!.bloodPressure})'
-                              : 'Hãy cập nhật chỉ số',
+                            _latestHealthLog != null &&
+                                    _latestHealthLog!.bloodPressure != null
+                                ? 'Ổn định (${_latestHealthLog!.bloodPressure})'
+                                : 'Hãy cập nhật chỉ số',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -857,110 +1340,11 @@ class _HomeTabState extends State<_HomeTab> with RouteAware {
   String _todayLabel() {
     final now = DateTime.now();
     const weekdays = [
-      'thứ hai', 'thứ ba', 'thứ tư',
-      'thứ năm', 'thứ sáu', 'thứ bảy', 'chủ nhật'
+      'thứ hai', 'thứ ba', 'thứ tư', 'thứ năm',
+      'thứ sáu', 'thứ bảy', 'chủ nhật'
     ];
     final weekday = weekdays[now.weekday - 1];
     return 'Hôm nay là $weekday, ${now.day} tháng ${now.month}';
-  }
-}
-
-// ─────────────────────────────────────────────
-// TASK CARD
-// ─────────────────────────────────────────────
-class _TaskCard extends StatelessWidget {
-  final String emoji;
-  final String badge;
-  final Color badgeColor;
-  final Color? badgeTextColor;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _TaskCard({
-    required this.emoji,
-    required this.badge,
-    required this.badgeColor,
-    this.badgeTextColor,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isLight = badgeTextColor != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.card,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppTheme.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(emoji, style: const TextStyle(fontSize: 28)),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: badgeColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    badge,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: isLight ? badgeTextColor : Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Xem chi tiết',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppTheme.textMuted,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -973,7 +1357,7 @@ class _TodayTaskItem extends StatelessWidget {
   final String title;
   final String time;
   final String extraInfo;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _TodayTaskItem({
     required this.icon,
@@ -981,7 +1365,7 @@ class _TodayTaskItem extends StatelessWidget {
     required this.title,
     required this.time,
     required this.extraInfo,
-    required this.onTap,
+    this.onTap,
   });
 
   @override
@@ -1039,7 +1423,8 @@ class _TodayTaskItem extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: AppTheme.primaryLight,
                 borderRadius: BorderRadius.circular(12),

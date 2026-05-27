@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'api_service.dart';
+import 'socket_service.dart';
 import '../models/health_log_model.dart';
 import 'auth_service.dart';
 
@@ -22,10 +23,12 @@ class HealthService {
       return [];
     }
   }
+
   static Future<bool> addHealthLog({
     int? systolic,
     int? diastolic,
     int? heartRate,
+    double? weight,
   }) async {
     try {
       final userId = AuthService.currentUser?.userId;
@@ -39,10 +42,30 @@ class HealthService {
         'systolic': systolic,
         'diastolic': diastolic,
         'heartRate': heartRate,
+        if (weight != null) 'weight': weight,
         'recordedBy': 'self',
       });
 
-      return response.statusCode == 201 || response.statusCode == 200;
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        // Emit socket event so caregiver gets real-time notification on web
+        try {
+          final body = jsonDecode(response.body);
+          final healthLogId = body['id'] ?? '';
+          final bpStr = (systolic != null && diastolic != null)
+              ? '$systolic/$diastolic'
+              : null;
+          SocketService.emitHealthLogSubmitted(
+            userId: userId,
+            healthLogId: healthLogId,
+            bloodPressure: bpStr,
+            heartRate: heartRate,
+          );
+        } catch (e) {
+          print('Error emitting health_log_submitted socket event: $e');
+        }
+        return true;
+      }
+      return false;
     } catch (e) {
       print('Error adding health log: $e');
       return false;

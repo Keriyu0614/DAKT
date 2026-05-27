@@ -14,7 +14,8 @@ import {
     type Notification,
     NotificationStatus,
     DeliveryChannel,
-    RecipientType
+    RecipientType,
+    SourceEventType
 } from '../../api/notification.api';
 import './NotificationCard.css';
 
@@ -123,8 +124,14 @@ const NotificationCard = ({
     const statusBadge = getStatusBadge(notif.status);
     const sourceType = notif.title.includes('Appointment') ? 'Lịch khám' : notif.title.includes('Medication') ? 'Thuốc' : 'Sức khỏe';
 
+    const isHealthNotif = notif.sourceEventType === SourceEventType.Health
+        || notif.title.toLowerCase().includes('chỉ số')
+        || notif.title.toLowerCase().includes('sức khỏe')
+        || notif.title.toLowerCase().includes('tự ghi')
+        || notif.title.toLowerCase().includes('cảnh báo chỉ số');
+
     return (
-        <div className={`notification-card ${statusBadge.className}`}>
+        <div className={`notification-card ${statusBadge.className}`} onClick={() => onViewDetails(notif)} style={{ cursor: 'pointer' }}>
             <div className={`status-badge ${statusBadge.className}`}>
                 {statusBadge.icon}
                 <span>{statusBadge.text}</span>
@@ -133,15 +140,13 @@ const NotificationCard = ({
             <div className="notification-content">
                 <h3 className="notification-title">{notif.title}</h3>
                 <p className="notification-message">{truncateMessage(notif.message)}</p>
-                {notif.message.length > 150 && (
-                    <button
-                        className="view-details-link"
-                        onClick={() => onViewDetails(notif)}
-                        disabled={loadingDetail}
-                    >
-                        {loadingDetail ? 'Đang tải...' : 'Xem chi tiết'}
-                    </button>
-                )}
+                <button
+                    className="view-details-link"
+                    onClick={(e) => { e.stopPropagation(); onViewDetails(notif); }}
+                    disabled={loadingDetail}
+                >
+                    {loadingDetail ? 'Đang tải...' : 'Xem chi tiết →'}
+                </button>
             </div>
 
             <div className="notification-metadata">
@@ -158,7 +163,7 @@ const NotificationCard = ({
                     <span>Người nhận: {getRecipientText(notif.recipientType)}</span>
                 </div>
                 <div className="metadata-item">
-                    <span className="source-link" onClick={() => onViewDetails(notif)}>
+                    <span className="source-link" onClick={(e) => { e.stopPropagation(); onViewDetails(notif); }}>
                         🔗 Nguồn: Nhắc nhở → {sourceType}
                     </span>
                 </div>
@@ -170,11 +175,11 @@ const NotificationCard = ({
                 )}
             </div>
 
-            <div className="notification-actions">
+            <div className="notification-actions" onClick={(e) => e.stopPropagation()}>
                 {notif.status === NotificationStatus.Delivered && (
                     <button
                         className="btn-action btn-primary"
-                        onClick={() => onMarkAsRead(notif)}
+                        onClick={(e) => { e.stopPropagation(); onMarkAsRead(notif); }}
                         disabled={isActioning}
                     >
                         <Eye size={20} />
@@ -184,17 +189,22 @@ const NotificationCard = ({
                 {notif.status === NotificationStatus.Read && (
                     <button
                         className="btn-action btn-primary"
-                        onClick={() => onAcknowledge(notif)}
+                        onClick={(e) => { e.stopPropagation(); onAcknowledge(notif); }}
                         disabled={isActioning}
                     >
                         <CheckCheck size={20} />
-                        {isActioning ? 'Đang xác nhận...' : 'Xác nhận'}
+                        {isActioning
+                            ? 'Đang xác nhận...'
+                            : isHealthNotif
+                                ? 'Xác nhận & lưu vào hồ sơ'
+                                : 'Xác nhận'
+                        }
                     </button>
                 )}
                 {notif.status === NotificationStatus.Failed && (
                     <button
                         className="btn-action btn-warning"
-                        onClick={() => onRetry(notif)}
+                        onClick={(e) => { e.stopPropagation(); onRetry(notif); }}
                         disabled={isActioning}
                     >
                         <RefreshCw size={20} />

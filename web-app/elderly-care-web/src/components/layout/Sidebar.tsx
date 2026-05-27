@@ -3,16 +3,16 @@ import { useTranslation } from "react-i18next";
 import {
   LayoutDashboard,
   Activity,
-  Bell,
   BellRing,
-  FileText,
-  User,
-  Settings
+  User
 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 import "./Sidebar.css";
 
 export default function Sidebar() {
   const { t } = useTranslation();
+  const { user, managedElderly, setManagedElderly } = useAuth();
+  const isCaregiver = user?.role === "Caregiver" || user?.role === "1" || String(user?.role) === "1";
 
   return (
     <aside className="app-sidebar">
@@ -37,30 +37,24 @@ export default function Sidebar() {
           <span>{t('medications')}</span>
         </NavLink> */}
 
-        <NavLink to="/app/health" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Activity size={20} />
-          <span>{t('health_logs')}</span>
-        </NavLink>
+        {(!isCaregiver || managedElderly) && (
+          <>
+            <NavLink to="/app/health" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+              <Activity size={20} />
+              <span>{t('health_logs')}</span>
+            </NavLink>
 
-        <NavLink to="/app/reminders" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Bell size={20} />
-          <span>{t('reminders')}</span>
-        </NavLink>
+            <NavLink to="/app/notifications" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+              <BellRing size={20} />
+              <span>{t('notifications')}</span>
+            </NavLink>
 
-        <NavLink to="/app/notifications" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <BellRing size={20} />
-          <span>{t('notifications')}</span>
-        </NavLink>
-
-        <NavLink to="/app/reports" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <FileText size={20} />
-          <span>{t('reports')}</span>
-        </NavLink>
-
-        <NavLink to="/app/health-schedule" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-          <Activity size={20} />
-          <span>{t('health_schedule')}</span>
-        </NavLink>
+            <NavLink to="/app/health-schedule" className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+              <Activity size={20} />
+              <span>{t('health_schedule')}</span>
+            </NavLink>
+          </>
+        )}
 
         <div className="sidebar-divider"></div>
 
@@ -73,6 +67,16 @@ export default function Sidebar() {
           <Settings size={20} />
           <span>{t('settings')}</span>
         </NavLink> */}
+
+        {managedElderly && (
+          <div className="sidebar-managed-elderly">
+            <p className="managed-title">Đang thực hiện quản lý với:</p>
+            <p className="managed-name">{managedElderly.name}</p>
+            <button onClick={() => setManagedElderly(null)} className="managed-exit-btn">
+              Thoát
+            </button>
+          </div>
+        )}
       </nav>
     </aside>
   );

@@ -32,7 +32,7 @@ const MedicationCard = ({
                     </div>
                 </div>
                 <div className={`status-badge ${med.status.toLowerCase()}`}>
-                    {med.status}
+                    {med.status === 'Active' ? 'Đang dùng' : med.status === 'Paused' ? 'Tạm dừng' : med.status === 'Completed' ? 'Đã hoàn thành' : med.status}
                 </div>
             </div>
 
@@ -41,13 +41,13 @@ const MedicationCard = ({
                     <Clock size={16} />
                     <span>
                         {med.frequency.type === 'Daily'
-                            ? `${med.frequency.timesPerDay}x Daily (${med.frequency.specificTimes?.join(', ')})`
-                            : med.frequency.type}
+                            ? `${med.frequency.timesPerDay} lần/ngày (${med.frequency.specificTimes?.join(', ')})`
+                            : med.frequency.type === 'Weekly' ? 'Hằng tuần' : (med.frequency.type as string) === 'Monthly' ? 'Hằng tháng' : med.frequency.type}
                     </span>
                 </div>
                 <div className="detail-row">
                     <Calendar size={16} />
-                    <span>Started: {new Date(med.startDate).toLocaleDateString()}</span>
+                    <span>Ngày bắt đầu: {new Date(med.startDate).toLocaleDateString('vi-VN')}</span>
                 </div>
                 {med.instructions && (
                     <div className="detail-row" style={{ fontStyle: 'italic', color: '#64748b' }}>
@@ -60,17 +60,17 @@ const MedicationCard = ({
             {!isReadOnly && (
                 <div className="med-actions">
                     <button className="btn-action" onClick={onEdit}>
-                        <Edit2 size={16} /> Edit
+                        <Edit2 size={16} /> Sửa
                     </button>
                     {onToggle && (
                         <button className={`btn-action ${isPaused ? 'btn-primary' : 'btn-warning'}`} onClick={onToggle}>
                             {isPaused ? <PlayCircle size={16} /> : <PauseCircle size={16} />}
-                            {isPaused ? 'Resume' : 'Pause'}
+                            {isPaused ? 'Tiếp tục' : 'Tạm dừng'}
                         </button>
                     )}
                     {isPaused && onDelete && (
                         <button className="btn-action" onClick={onDelete} style={{ color: '#ef4444' }}>
-                            <Trash2 size={16} /> Delete
+                            <Trash2 size={16} /> Xóa
                         </button>
                     )}
                 </div>

@@ -67,4 +67,14 @@ export const medicationApi = {
 
     deleteMedication: (id: string): Promise<AxiosResponse<void>> =>
         axiosClient.delete(`/api/medications/${id}`),
+
+    importFromExcel: (userId: string, file: File): Promise<AxiosResponse<{ message: string; importedCount: number; errors?: string[] }>> => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return axiosClient.post(`/api/medications/import/${userId}`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
 };

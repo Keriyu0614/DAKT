@@ -12,10 +12,14 @@ import { toast } from 'react-toastify';
 import AppointmentCard, { type Appointment } from '../../components/appointment/AppointmentCard';
 import AppointmentDetailModal from '../../components/appointment/AppointmentDetailModal';
 import AppointmentForm from '../../components/appointment/AppointmentForm';
+import { useAuth } from '../../context/AuthContext';
 import './AppointmentsPage.css';
 
 export const AppointmentsPage = () => {
     const { t } = useTranslation();
+    const { user, managedElderly } = useAuth();
+    const activeUserId = managedElderly?.id || user?.id;
+
     // --- State ---
     const [appointments, setAppointments] = useState<Appointment[]>([]);
     const [loading, setLoading] = useState(true);
@@ -30,12 +34,12 @@ export const AppointmentsPage = () => {
     // --- Data Fetching ---
     useEffect(() => {
         fetchAppointments();
-    }, []);
+    }, [activeUserId]);
 
     const fetchAppointments = async () => {
         setLoading(true);
         try {
-            const response = await appointmentApi.getAll();
+            const response = await appointmentApi.getAll(activeUserId);
             setAppointments(response.data);
             setError('');
         } catch (err) {
@@ -194,6 +198,7 @@ export const AppointmentsPage = () => {
                 onClose={() => setShowForm(false)}
                 editingAppointment={editingAppointment}
                 onSuccess={fetchAppointments}
+                userId={activeUserId}
             />
         </div>
     );

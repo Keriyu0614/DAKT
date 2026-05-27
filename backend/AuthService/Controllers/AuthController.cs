@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using AuthService.Data;
 using AuthService.Models;
@@ -181,7 +182,7 @@ public class AuthController : ControllerBase
                     Name = payload.Name,
                     Email = email,
                     Password = Guid.NewGuid().ToString(), // Random password for Google users
-                    Role = UserRole.Elderly,
+                    Role = UserRole.Caregiver,
                     CreatedAt = DateTime.UtcNow
                 };
                 _context.Users.Add(user);
@@ -260,7 +261,51 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Create a new elderly account and link it to the caregiver
+    /// Link an existing elderly account to a caregiver.
+    /// Một người cao tuổi chỉ được liên kết với 1 người chăm sóc.
+    /// </summary>
+    [HttpPost("link-elderly")]
+    public async Task<ActionResult<AuthResponseDto>> LinkElderly([FromBody] LinkElderlyDto dto)
+    {
+        _logger.LogInformation("Link elderly request from caregiver: {CaregiverId} for email: {Email}", dto.CaregiverId, dto.Email);
+
+        var elderly = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email.ToLowerInvariant() && u.Role == UserRole.Elderly);
+        if (elderly == null)
+        {
+            return NotFound(new { message = "Không tìm thấy tài khoản người cao tuổi với email này." });
+        }
+
+        // Kiểm tra caregiver này đã liên kết với elderly này chưa
+        if (await _context.UserConnections.AnyAsync(c => c.CaregiverId == dto.CaregiverId && c.ElderlyId == elderly.Id))
+        {
+            return BadRequest(new { message = "Tài khoản này đã được liên kết." });
+        }
+
+        // Kiểm tra elderly đã có caregiver nào khác chưa (1 elderly chỉ có 1 caregiver)
+        if (await _context.UserConnections.AnyAsync(c => c.ElderlyId == elderly.Id))
+        {
+            return BadRequest(new { message = "Người cao tuổi này đã được liên kết với một người chăm sóc khác." });
+        }
+
+        var connection = new UserConnection
+        {
+            Id = Guid.NewGuid(),
+            CaregiverId = dto.CaregiverId,
+            ElderlyId = elderly.Id,
+            ConnectedAt = DateTime.UtcNow
+        };
+
+        _context.UserConnections.Add(connection);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Elderly user linked: {ElderlyId} to {CaregiverId}", elderly.Id, dto.CaregiverId);
+        
+        return Ok(AuthResponseDto.FromUser(elderly, GeneratePlaceholderToken(elderly)));
+    }
+
+    /// <summary>
+    /// Create a new elderly account and link it to the caregiver.
+    /// Một người cao tuổi chỉ được liên kết với 1 người chăm sóc.
     /// </summary>
     [HttpPost("create-elderly")]
     public async Task<ActionResult<AuthResponseDto>> CreateAndLinkElderly([FromBody] CreateElderlyDto dto)
@@ -284,6 +329,7 @@ public class AuthController : ControllerBase
 
         _context.Users.Add(elderly);
         
+        // Tài khoản mới tạo chưa có caregiver nào — liên kết trực tiếp
         var connection = new UserConnection
         {
             Id = Guid.NewGuid(),
@@ -496,6 +542,32 @@ public class AuthController : ControllerBase
     {
         var connections = await _context.UserConnections.ToListAsync();
         return Ok(connections);
+    }
+
+    /// <summary>
+    /// Change user password
+    /// </summary>
+    [HttpPost("change-password/{userId}")]
+    public async Task<ActionResult> ChangePassword(Guid userId, [FromBody] ChangePasswordDto dto)
+    {
+        _logger.LogInformation("Change password request for user: {UserId}", userId);
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+            return NotFound(new { message = "User not found" });
+
+        if (user.Password != dto.CurrentPassword)
+            return BadRequest(new { message = "Mật khẩu hiện tại không đúng." });
+
+        if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 6)
+            return BadRequest(new { message = "Mật khẩu mới phải có ít nhất 6 ký tự." });
+
+        user.Password = dto.NewPassword;
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Password changed successfully for user: {UserId}", userId);
+        return Ok(new { message = "Đổi mật khẩu thành công." });
     }
 
     /// <summary>

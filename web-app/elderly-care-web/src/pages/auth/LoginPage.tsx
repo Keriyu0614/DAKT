@@ -35,6 +35,13 @@ export const LoginPage = () => {
 
             const data = response.data;
 
+            // Chặn Elderly login Web
+            if (data.role === "Elderly" || data.role === "0" || data.role === 0 as any) {
+                setError("Tài khoản người cao tuổi chỉ có thể đăng nhập trên ứng dụng điện thoại.");
+                setLoading(false);
+                return;
+            }
+
             // ✅ MAP ĐÚNG CẤU TRÚC AuthContext CẦN
             login(data);
 
@@ -56,10 +63,18 @@ export const LoginPage = () => {
     const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
         if (!credentialResponse.credential) return;
 
-        try {
+            try {
             setLoading(true);
             const response = await authApi.googleLogin(credentialResponse.credential);
-            login(response.data);
+            const data = response.data;
+
+            // Chặn Elderly login Web
+            if (data.role === "Elderly" || data.role === "0" || data.role === 0 as any) {
+                setError("Tài khoản người cao tuổi chỉ có thể đăng nhập trên ứng dụng điện thoại.");
+                return;
+            }
+
+            login(data, true);
             navigate("/app");
             toast.success("Đăng nhập bằng Google thành công!");
         } catch (err: any) {
@@ -73,6 +88,7 @@ export const LoginPage = () => {
     return (
         <div style={styles.container}>
             <div style={styles.card}>
+                <img src="/CareLink.png" alt="CareLink" style={styles.logo} />
                 <h1 style={styles.title}>Đăng nhập</h1>
                 <p style={styles.subtitle}>
                     Đăng nhập để quản lý thông tin thuốc và sức khỏe của bạn
@@ -122,7 +138,6 @@ export const LoginPage = () => {
                         useOneTap
                         theme="filled_blue"
                         shape="pill"
-                        width="100%"
                     />
                 </div>
 
@@ -156,6 +171,12 @@ const styles: Record<string, React.CSSProperties> = {
         width: "100%",
         maxWidth: "500px",
         textAlign: "center",
+    },
+    logo: {
+        height: "72px",
+        width: "auto",
+        objectFit: "contain",
+        marginBottom: "12px",
     },
     title: {
         fontSize: "36px",

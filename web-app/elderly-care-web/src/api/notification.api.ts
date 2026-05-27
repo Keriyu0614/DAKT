@@ -1,12 +1,5 @@
-import axios, { type AxiosResponse } from "axios";
-
-// Create specific client for Notification Service
-const notificationClient = axios.create({
-    baseURL: import.meta.env.VITE_API_NOTIFICATION_URL || 'http://localhost:5006',
-    headers: {
-        "Content-Type": "application/json",
-    },
-});
+import type { AxiosResponse } from "axios";
+import axiosClient from "./axiosClient";
 
 // Notification delivery status (matches backend)
 export const NotificationStatus = {
@@ -39,7 +32,8 @@ export type RecipientType = typeof RecipientType[keyof typeof RecipientType];
 export const SourceEventType = {
     Medication: 0,
     Appointment: 1,
-    Health: 2
+    Health: 2,
+    Emergency: 3
 } as const;
 export type SourceEventType = typeof SourceEventType[keyof typeof SourceEventType];
 
@@ -48,6 +42,8 @@ export interface Notification {
     id: string;
     userId: string;
     sourceReminderId: string;
+    sourceEventType?: SourceEventType;
+    sourceEventId?: string;
     title: string;
     message: string;
     status: NotificationStatus;
@@ -109,23 +105,30 @@ export interface UpdateNotificationStatusPayload {
 export const notificationApi = {
     // Get all notifications for current user
     getNotifications: (userId: string, page = 1, pageSize = 50): Promise<AxiosResponse<Notification[]>> =>
-        notificationClient.get("/api/notifications", {
+        axiosClient.get("/api/notifications", {
             params: { userId, page, pageSize }
         }),
 
     // Get notification detail by ID
     getNotificationDetail: (id: string): Promise<AxiosResponse<NotificationDetail>> =>
-        notificationClient.get(`/api/notifications/${id}`),
+        axiosClient.get(`/api/notifications/${id}`),
 
     // Mark notification as read
     markAsRead: (id: string): Promise<AxiosResponse<Notification>> =>
-        notificationClient.patch(`/api/notifications/${id}/read`, {}),
+        axiosClient.patch(`/api/notifications/${id}/read`, {}),
 
     // Acknowledge notification
     acknowledge: (id: string): Promise<AxiosResponse<Notification>> =>
-        notificationClient.patch(`/api/notifications/${id}/acknowledge`, {}),
+        axiosClient.patch(`/api/notifications/${id}/acknowledge`, {}),
+
+    // Acknowledge a Health-type notification (marks as acknowledged)
+    // After this, the web HealthPage will refresh to show the elderly's self-recorded log
+    acknowledgeHealth: (id: string): Promise<AxiosResponse<Notification>> =>
+        axiosClient.patch(`/api/notifications/${id}/acknowledge-health`, {}),
 
     // Retry failed notification delivery
     retryDelivery: (id: string): Promise<AxiosResponse<Notification>> =>
-        notificationClient.post(`/api/notifications/${id}/retry`, {}),
+        axiosClient.post(`/api/notifications/${id}/retry`, {}),
+    getHealthLogBySourceId: (sourceId: string): Promise<AxiosResponse<any>> =>
+    axiosClient.get(`/api/health-logs/${sourceId}`),
 };

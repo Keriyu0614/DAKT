@@ -6,43 +6,30 @@ import {
   type Notification,
   NotificationStatus,
 } from "../../api/notification.api";
-import { reminderApi, type Reminder } from "../../api/reminder.api";
-import { medicationApi } from "../../api/medication.api";
-import { appointmentApi } from "../../api/appointment.api";
 import {
   Bell,
-  Calendar,
   AlertTriangle,
   Check,
   Activity,
   Clock,
   ExternalLink,
-  Eye,
   Info,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import "./NotificationBell.css";
 
-interface EnrichedReminder extends Reminder {
-  message?: string;
-  sourceEventName?: string;
-  sourceEventType?: string;
-}
-
 export default function NotificationBell() {
-  const { user } = useAuth();
+  const { user, managedElderly } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"notifications" | "reminders">("notifications");
-  
-  // Data State
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
-  const [medications, setMedications] = useState<any[]>([]);
-  const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const isCaregiver = user?.role === "Caregiver" || user?.role === "1" || String(user?.role) === "1";
+
+  // Caregiver chỉ dùng id người cao tuổi đang quản lý, không fallback về user?.id
+  const activeUserId = isCaregiver ? managedElderly?.id : user?.id;
 
   // Click outside to close dropdown
   useEffect(() => {
@@ -57,101 +44,55 @@ export default function NotificationBell() {
 
   // Fetch data
   const fetchData = async (isSilent = false) => {
-    if (!user?.id) return;
+    if (!activeUserId) return;
     if (!isSilent) setLoading(true);
-    
     try {
-      const [notifRes, remRes, medRes, apptRes] = await Promise.all([
-        notificationApi.getNotifications(user.id).catch(() => ({ data: [] })),
-        reminderApi.getReminders().catch(() => ({ data: [] })),
-        medicationApi.getMedications().catch(() => ({ data: [] })),
-        appointmentApi.getAll().catch(() => ({ data: [] })),
-      ]);
-
+      const notifRes = await notificationApi.getNotifications(activeUserId);
       setNotifications(notifRes.data);
-      
-      // Sort reminders by time ascending
-      const sortedRem = (remRes.data as Reminder[]).sort(
-        (a, b) => new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime()
-      );
-      setReminders(sortedRem);
-      setMedications(medRes.data);
-      setAppointments(apptRes.data);
     } catch (error) {
-      console.error("Error loading notification bell data:", error);
+      console.error("[NotificationBell] Error:", error);
+      setNotifications([]);
     } finally {
       if (!isSilent) setLoading(false);
     }
   };
 
-  // Poll for updates every 8 seconds
+  // Poll mỗi 8 giây — reset khi không có activeUserId
   useEffect(() => {
-    if (user?.id) {
+    if (activeUserId) {
       fetchData(true);
       const interval = setInterval(() => fetchData(true), 8000);
       return () => clearInterval(interval);
+    } else {
+      setNotifications([]);
+      setIsOpen(false);
     }
-  }, [user?.id]);
+  }, [activeUserId]);
 
-  // Handle open dropdown
-  const handleToggle = () => {
-    setIsOpen(!isOpen);
-    if (!isOpen) {
-      fetchData();
-    }
-  };
-
-  // Compute active counts
+  // Tất cả useMemo phải ở đây, TRƯỚC return null
   const unreadNotifCount = useMemo(() => {
-    return notifications.filter(
+    const uniqueNotifs = Array.from(new Map(notifications.map(n => [n.id, n])).values());
+    return uniqueNotifs.filter(
       (n) => n.status !== NotificationStatus.Read && n.status !== NotificationStatus.Acknowledged
     ).length;
   }, [notifications]);
 
-  const activeReminderCount = useMemo(() => {
-    // Only count today's pending reminders
-    const todayStr = new Date().toDateString();
-    return reminders.filter(
-      (r) => r.status === 0 && new Date(r.scheduledTime).toDateString() === todayStr
-    ).length;
-  }, [reminders]);
+  const uniqueNotifications = useMemo(() => {
+    return Array.from(new Map(notifications.map(n => [n.id, n])).values());
+  }, [notifications]);
 
-  const totalCount = unreadNotifCount + activeReminderCount;
+  // Ẩn chuông nếu là caregiver chưa chọn người cao tuổi — return null SAU tất cả hooks
+  if (isCaregiver && !managedElderly) {
+    return null;
+  }
 
-  // Enrich reminders
-  const enrichedReminders = useMemo((): EnrichedReminder[] => {
-    return reminders.map((rem) => {
-      let sourceEventName = "Xem chi tiết";
-      let sourceEventType = "Nhắc nhở";
+  const totalCount = unreadNotifCount;
 
-      if (rem.type === 1) {
-        sourceEventType = "Lịch khám";
-        const apt = appointments.find((a) => a.id === rem.referenceId);
-        if (apt) sourceEventName = apt.doctorName;
-      } else if (rem.type === 0) {
-        sourceEventType = "Thuốc";
-        const med = medications.find((m) => m.id === rem.referenceId);
-        if (med) sourceEventName = med.name;
-      }
+  const handleToggle = () => {
+    setIsOpen(!isOpen);
+    if (!isOpen) fetchData();
+  };
 
-      return {
-        ...rem,
-        message: `${sourceEventType}: ${sourceEventName}`,
-        sourceEventName,
-        sourceEventType,
-      };
-    });
-  }, [reminders, appointments, medications]);
-
-  // Today's pending reminders
-  const pendingRemindersToday = useMemo(() => {
-    const todayStr = new Date().toDateString();
-    return enrichedReminders.filter(
-      (r) => r.status === 0 && new Date(r.scheduledTime).toDateString() === todayStr
-    );
-  }, [enrichedReminders]);
-
-  // Mark single notification as read
   const handleMarkNotifRead = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
@@ -165,13 +106,12 @@ export default function NotificationBell() {
     }
   };
 
-  // Mark all notifications as read
   const handleMarkAllRead = async () => {
-    const unread = notifications.filter(
+    const uniqueNotifs = Array.from(new Map(notifications.map(n => [n.id, n])).values());
+    const unread = uniqueNotifs.filter(
       (n) => n.status !== NotificationStatus.Read && n.status !== NotificationStatus.Acknowledged
     );
     if (unread.length === 0) return;
-
     try {
       await Promise.all(unread.map((n) => notificationApi.markAsRead(n.id)));
       setNotifications((prev) =>
@@ -183,29 +123,16 @@ export default function NotificationBell() {
     }
   };
 
-  // Mark reminder as done
-  const handleMarkReminderDone = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await reminderApi.markAsCompleted(id);
-      setReminders((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status: 1 } : r))
-      );
-      toast.success("Đã hoàn thành nhắc nhở");
-    } catch {
-      toast.error("Lỗi khi hoàn thành nhắc nhở");
-    }
-  };
-
-  // Helper formatting relative time
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  // Get icon for notification
   const getNotificationIcon = (title: string, message: string) => {
     const combined = `${title} ${message}`.toLowerCase();
+    if (combined.includes("khẩn cấp") || combined.includes("cần hỗ trợ")) {
+      return <AlertTriangle className="notif-item-icon warning" size={18} style={{ color: "#dc2626" }} />;
+    }
     if (combined.includes("cảnh báo") || combined.includes("bất thường") || combined.includes("nguy hiểm")) {
       return <AlertTriangle className="notif-item-icon warning" size={18} />;
     }
@@ -217,9 +144,8 @@ export default function NotificationBell() {
 
   return (
     <div className="notification-bell-container" ref={dropdownRef}>
-      {/* Bell Trigger Icon */}
-      <button 
-        onClick={handleToggle} 
+      <button
+        onClick={handleToggle}
         className={`bell-trigger-button ${isOpen ? "active" : ""}`}
         aria-label="Thông báo"
       >
@@ -231,137 +157,69 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown Panel */}
       {isOpen && (
         <div className="bell-dropdown-panel animate-slide-in">
-          {/* Header */}
           <div className="bell-dropdown-header">
             <h3>Trung tâm thông báo</h3>
-            {activeTab === "notifications" && unreadNotifCount > 0 && (
+            {unreadNotifCount > 0 && (
               <button onClick={handleMarkAllRead} className="btn-mark-all-read">
                 <Check size={14} /> Đọc tất cả
               </button>
             )}
           </div>
 
-          {/* Tabs */}
-          <div className="bell-dropdown-tabs">
-            <button
-              onClick={() => setActiveTab("notifications")}
-              className={`bell-tab-btn ${activeTab === "notifications" ? "active" : ""}`}
-            >
-              Thông báo ({unreadNotifCount})
-            </button>
-            <button
-              onClick={() => setActiveTab("reminders")}
-              className={`bell-tab-btn ${activeTab === "reminders" ? "active" : ""}`}
-            >
-              Nhắc nhở hôm nay ({activeReminderCount})
-            </button>
-          </div>
-
-          {/* List Content */}
           <div className="bell-dropdown-content-list custom-scrollbar">
             {loading ? (
               <div className="bell-dropdown-placeholder">
                 <div className="spinner"></div>
                 <p>Đang tải dữ liệu...</p>
               </div>
-            ) : activeTab === "notifications" ? (
-              // --- NOTIFICATIONS LIST ---
-              notifications.length === 0 ? (
-                <div className="bell-dropdown-placeholder">
-                  <Activity size={36} className="placeholder-icon" />
-                  <p>Không có thông báo mới nào</p>
-                </div>
-              ) : (
-                notifications.slice(0, 10).map((notif) => {
-                  const isUnread =
-                    notif.status !== NotificationStatus.Read &&
-                    notif.status !== NotificationStatus.Acknowledged;
-                  return (
-                    <div
-                      key={notif.id}
-                      className={`bell-list-item notif-item ${isUnread ? "unread" : ""}`}
-                      onClick={() => {
-                        setIsOpen(false);
-                        navigate("/app/notifications");
-                      }}
-                    >
-                      {getNotificationIcon(notif.title, notif.message)}
-                      <div className="item-details">
-                        <h4 className="item-title">{notif.title}</h4>
-                        <p className="item-message">{notif.message}</p>
-                        <span className="item-time">
-                          <Clock size={12} /> {formatTime(notif.sentAt)}
-                        </span>
-                      </div>
-                      {isUnread && (
-                        <button
-                          onClick={(e) => handleMarkNotifRead(notif.id, e)}
-                          className="btn-item-action mark-read"
-                          title="Đánh dấu đã đọc"
-                        >
-                          <Check size={14} />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })
-              )
+            ) : uniqueNotifications.length === 0 ? (
+              <div className="bell-dropdown-placeholder">
+                <Activity size={36} className="placeholder-icon" />
+                <p>Không có thông báo mới nào</p>
+              </div>
             ) : (
-              // --- REMINDERS LIST ---
-              pendingRemindersToday.length === 0 ? (
-                <div className="bell-dropdown-placeholder">
-                  <Calendar size={36} className="placeholder-icon" />
-                  <p>Không có nhắc nhở chưa hoàn thành hôm nay</p>
-                </div>
-              ) : (
-                pendingRemindersToday.slice(0, 10).map((rem) => (
+              uniqueNotifications.slice(0, 10).map((notif) => {
+                const isUnread =
+                  notif.status !== NotificationStatus.Read &&
+                  notif.status !== NotificationStatus.Acknowledged;
+                return (
                   <div
-                    key={rem.id}
-                    className="bell-list-item reminder-item"
+                    key={notif.id}
+                    className={`bell-list-item notif-item ${isUnread ? "unread" : ""}`}
                     onClick={() => {
                       setIsOpen(false);
-                      navigate("/app/reminders");
+                      navigate("/app/notifications");
                     }}
                   >
-                    {rem.type === 0 ? (
-                      <Activity className="notif-item-icon medication" size={18} />
-                    ) : (
-                      <Calendar className="notif-item-icon appointment" size={18} />
-                    )}
+                    {getNotificationIcon(notif.title, notif.message)}
                     <div className="item-details">
-                      <h4 className="item-title">{rem.sourceEventType}</h4>
-                      <p className="item-message">{rem.sourceEventName}</p>
+                      <h4 className="item-title">{notif.title}</h4>
+                      <p className="item-message">{notif.message}</p>
                       <span className="item-time">
-                        <Clock size={12} /> {formatTime(rem.scheduledTime)}
+                        <Clock size={12} /> {formatTime(notif.sentAt)}
                       </span>
                     </div>
-                    <button
-                      onClick={(e) => handleMarkReminderDone(rem.id, e)}
-                      className="btn-item-action mark-done"
-                      title="Hoàn thành"
-                    >
-                      <Check size={14} />
-                    </button>
+                    {isUnread && (
+                      <button
+                        onClick={(e) => handleMarkNotifRead(notif.id, e)}
+                        className="btn-item-action mark-read"
+                        title="Đánh dấu đã đọc"
+                      >
+                        <Check size={14} />
+                      </button>
+                    )}
                   </div>
-                ))
-              )
+                );
+              })
             )}
           </div>
 
-          {/* Footer */}
           <div className="bell-dropdown-footer">
-            {activeTab === "notifications" ? (
-              <Link to="/app/notifications" onClick={() => setIsOpen(false)} className="btn-view-all">
-                Xem tất cả thông báo <ExternalLink size={14} />
-              </Link>
-            ) : (
-              <Link to="/app/reminders" onClick={() => setIsOpen(false)} className="btn-view-all">
-                Quản lý lịch nhắc nhở <ExternalLink size={14} />
-              </Link>
-            )}
+            <Link to="/app/notifications" onClick={() => setIsOpen(false)} className="btn-view-all">
+              Xem tất cả thông báo <ExternalLink size={14} />
+            </Link>
           </div>
         </div>
       )}

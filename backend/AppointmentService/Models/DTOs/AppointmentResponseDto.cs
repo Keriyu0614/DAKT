@@ -8,7 +8,7 @@ public class AppointmentResponseDto
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
     public string DoctorName { get; set; } = string.Empty;
-    public string Location { get; set; } = string.Empty;
+    public string? Location { get; set; }
     public DateTime AppointmentDate { get; set; }
     public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; }

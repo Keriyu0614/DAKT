@@ -147,8 +147,51 @@ public class RemindersController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        // If this is a medication reminder that was completed, create next reminder
+        if (reminder.Type == ReminderType.Medication && dto.Status == ReminderStatus.Done)
+        {
+            await CreateNextMedicationReminder(reminder);
+        }
+
         var response = ReminderResponseDto.FromEntity(reminder);
         return Ok(response);
+    }
+
+    private async Task CreateNextMedicationReminder(Reminder completedReminder)
+    {
+        try
+        {
+            // Vietnam timezone (GMT+7)
+            var vietnamTimeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            var completedTimeVietnam = TimeZoneInfo.ConvertTimeFromUtc(completedReminder.ScheduledTime, vietnamTimeZone);
+            
+            // Schedule next reminder for the same time tomorrow
+            var nextReminderTimeVietnam = completedTimeVietnam.AddDays(1);
+            var nextReminderTimeUtc = TimeZoneInfo.ConvertTimeToUtc(nextReminderTimeVietnam, vietnamTimeZone);
+            
+            var nextReminder = new Reminder
+            {
+                Id = Guid.NewGuid(),
+                UserId = completedReminder.UserId,
+                Type = ReminderType.Medication,
+                ReferenceId = completedReminder.ReferenceId,
+                ScheduledTime = nextReminderTimeUtc,
+                Status = ReminderStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _context.Reminders.Add(nextReminder);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Created next medication reminder {NextReminderId} for {NextTime} (Vietnam time)", 
+                nextReminder.Id, nextReminderTimeVietnam);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating next medication reminder for completed reminder {ReminderId}", 
+                completedReminder.Id);
+        }
     }
 
     /// <summary>

@@ -1,0 +1,69 @@
+=====================================
+  HUONG DAN KHOI DONG NHANH
+=====================================
+
+BUOC 1: KHOI DONG HE THONG
+---------------------------
+Chay lenh:
+  .\start.ps1
+
+Doi 30-60 giay de tat ca services khoi dong.
+
+
+BUOC 2: TRUY CAP WEB APP
+-------------------------
+Mo trinh duyet va truy cap:
+  http://localhost:5173
+
+
+BUOC 3: DANG NHAP
+------------------
+Email: caregiver1@example.com
+Mat khau: 123456
+
+
+DU LIEU MAU CO SAN
+-------------------
+- 5 tai khoan nguoi dung
+- 7 loai thuoc voi lich uong
+- 5 lich kham benh
+- 15 ban ghi suc khoe
+
+
+LENH HUU ICH
+------------
+Kiem tra trang thai:
+  .\check-status.ps1
+
+Reset du lieu:
+  .\reset-data.ps1
+
+
+TAI LIEU CHI TIET
+-----------------
+- HUONG_DAN_SU_DUNG.md
+- SEED_DATA_GUIDE.md
+- README.md
+
+
+LUU Y QUAN TRONG
+----------------
+- Du lieu KHONG bi mat khi dong terminal
+- Du lieu duoc luu trong Docker volume
+- Co the them du lieu moi sau khi dang nhap
+
+
+XU LY SU CO
+-----------
+Neu trang web hien thi trang:
+1. Kiem tra console log (F12 -> Console)
+2. Chay: .\check-status.ps1
+3. Doi them 30 giay
+
+Neu khong co du lieu:
+1. Chay: .\reset-data.ps1
+2. Chay: .\start.ps1
+
+
+CHUC BAN SU DUNG THANH CONG!
+=============================

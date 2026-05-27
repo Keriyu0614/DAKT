@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
 import '../services/health_service.dart';
+import '../services/socket_service.dart';
 import '../models/health_log_model.dart';
 import 'quick_health_entry_screen.dart';
 
@@ -21,6 +22,22 @@ class _HealthDetailScreenState extends State<HealthDetailScreen> {
   void initState() {
     super.initState();
     _fetchLogs();
+    // Listen for caregiver-submitted health logs via socket
+    SocketService.connect();
+    SocketService.on('health_log_submitted', _onHealthLogSubmitted);
+  }
+
+  @override
+  void dispose() {
+    SocketService.off('health_log_submitted', _onHealthLogSubmitted);
+    super.dispose();
+  }
+
+  void _onHealthLogSubmitted(dynamic data) {
+    // Refresh when caregiver submits a health log for this user
+    if (data is Map && data['recordedBy'] == 'caregiver') {
+      _fetchLogs();
+    }
   }
 
   Future<void> _fetchLogs() async {
@@ -82,13 +99,18 @@ class _HealthDetailScreenState extends State<HealthDetailScreen> {
     }
 
     // Determine current values based on latest log (if any)
-    String bpValue = '118/76';
-    String bpStatus = 'Bình thường';
-    bool bpStatusOk = true;
+    // statusOk=false + status='Chưa có dữ liệu' renders a neutral badge (warning color = gray-ish)
+    String bpValue = '--';
+    String bpStatus = 'Chưa có dữ liệu';
+    bool bpStatusOk = false; // false = neutral/warning badge color, won't show green
 
-    String hrValue = '72';
-    String hrStatus = 'Bình thường';
-    bool hrStatusOk = true;
+    String hrValue = '--';
+    String hrStatus = 'Chưa có dữ liệu';
+    bool hrStatusOk = false;
+
+    String weightValue = '--';
+    String weightStatus = 'Chưa có dữ liệu';
+    bool weightStatusOk = false;
 
     if (_healthLogs.isNotEmpty) {
       // Find latest log with blood pressure
@@ -112,6 +134,16 @@ class _HealthDetailScreenState extends State<HealthDetailScreen> {
         hrStatus = isOk ? 'Bình thường' : 'Chú ý';
         hrStatusOk = isOk;
       } catch (_) {}
+
+      // Find latest log with weight
+      try {
+        final latestWeightLog = _healthLogs.firstWhere(
+          (log) => log.weight != null,
+        );
+        weightValue = latestWeightLog.weight!.toStringAsFixed(1);
+        weightStatus = 'Bình thường';
+        weightStatusOk = true;
+      } catch (_) {}
     }
 
     final List<Map<String, String>> historyList = [];
@@ -124,14 +156,6 @@ class _HealthDetailScreenState extends State<HealthDetailScreen> {
           'status': _isStatusOk(log) ? 'Tốt' : 'Chú ý',
         });
       }
-    } else {
-      historyList.addAll([
-        {'date': 'Hôm nay', 'bp': '118/76', 'hr': '72', 'status': 'Tốt'},
-        {'date': 'Hôm qua', 'bp': '122/80', 'hr': '75', 'status': 'Tốt'},
-        {'date': '30/04', 'bp': '130/85', 'hr': '78', 'status': 'Chú ý'},
-        {'date': '29/04', 'bp': '120/78', 'hr': '74', 'status': 'Tốt'},
-        {'date': '28/04', 'bp': '116/74', 'hr': '71', 'status': 'Tốt'},
-      ]);
     }
 
     return Scaffold(
@@ -162,7 +186,11 @@ class _HealthDetailScreenState extends State<HealthDetailScreen> {
                               statusOk: bpStatusOk,
                             ),
                           ),
-                          const SizedBox(width: 12),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
                           Expanded(
                             child: _MetricCard(
                               label: 'Nhịp tim',
@@ -174,32 +202,16 @@ class _HealthDetailScreenState extends State<HealthDetailScreen> {
                               statusOk: hrStatusOk,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _MetricCard(
-                              label: 'Đường huyết',
-                              value: '6.4',
-                              unit: 'mmol/L',
-                              icon: Icons.water_drop_rounded,
-                              color: const Color(0xFF8B5CF6),
-                              status: 'Chú ý',
-                              statusOk: false,
-                            ),
-                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: _MetricCard(
                               label: 'Cân nặng',
-                              value: '68',
+                              value: weightValue,
                               unit: 'kg',
                               icon: Icons.monitor_weight_rounded,
                               color: AppTheme.warning,
-                              status: 'Bình thường',
-                              statusOk: true,
+                              status: weightStatus,
+                              statusOk: weightStatusOk,
                             ),
                           ),
                         ],
@@ -281,7 +293,42 @@ class _HealthDetailScreenState extends State<HealthDetailScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      ...historyList.map((d) => _HistoryItem(data: d)),
+                      if (historyList.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: AppTheme.card,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: AppTheme.border),
+                          ),
+                          child: const Column(
+                            children: [
+                              Icon(Icons.bar_chart_rounded, size: 48, color: AppTheme.textMuted),
+                              SizedBox(height: 12),
+                              Text(
+                                'Chưa có dữ liệu sức khoẻ',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'Nhấn nút "+ Nhập chỉ số" để bắt đầu\ntheo dõi sức khoẻ của bạn',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppTheme.textMuted,
+                                  height: 1.5,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ...historyList.map((d) => _HistoryItem(data: d)),
+
                     ],
                   ),
                 ),
@@ -357,7 +404,9 @@ class _MetricCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: statusOk ? AppTheme.secondaryLight : AppTheme.warningLight,
+                  color: status == 'Chưa có dữ liệu'
+                      ? AppTheme.divider
+                      : (statusOk ? AppTheme.secondaryLight : AppTheme.warningLight),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -365,7 +414,9 @@ class _MetricCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: statusOk ? AppTheme.secondary : AppTheme.warning,
+                    color: status == 'Chưa có dữ liệu'
+                        ? AppTheme.textSecondary
+                        : (statusOk ? AppTheme.secondary : AppTheme.warning),
                   ),
                 ),
               ),
@@ -510,19 +561,19 @@ class _HealthCheckScreenState extends State<HealthCheckScreen> {
 
   final _questions = [
     {
-      'q': 'Hôm nay bạn cảm thấy thế nào?',
+      'q': 'Hôm nay cụ cảm thấy thế nào?',
       'options': ['😊 Rất khoẻ', '🙂 Bình thường', '😔 Không khoẻ lắm', '😟 Mệt mỏi'],
     },
     {
-      'q': 'Bạn có đau ngực hay khó thở không?',
+      'q': 'Cụ có đau ngực hay khó thở không?',
       'options': ['Không có', 'Hơi khó chịu một chút', 'Có, khá rõ', 'Có, rất khó chịu'],
     },
     {
-      'q': 'Bạn ngủ được mấy tiếng tối qua?',
+      'q': 'Cụ ngủ được mấy tiếng tối qua?',
       'options': ['Hơn 8 tiếng', '6–8 tiếng', '4–6 tiếng', 'Dưới 4 tiếng'],
     },
     {
-      'q': 'Bạn đã uống đủ nước hôm nay chưa?',
+      'q': 'Cụ đã uống đủ nước hôm nay chưa?',
       'options': ['Rồi, đủ 2L', 'Khoảng 1L', 'Ít hơn 1L', 'Chưa uống gì'],
     },
   ];
@@ -619,60 +670,189 @@ class _HealthCheckScreenState extends State<HealthCheckScreen> {
     );
   }
 
+  Map<String, dynamic> _generateHealthFeedback() {
+    List<String> advices = [];
+    String statusTitle = 'Sức khoẻ ổn định';
+    Color statusColor = AppTheme.secondary;
+    IconData statusIcon = Icons.check_circle_rounded;
+    bool hasCriticalAlert = false;
+    bool hasWarning = false;
+
+    // Check Chest Pain / Breathlessness (Question 1)
+    final q1Answer = _answers[1];
+    if (q1Answer == 2 || q1Answer == 3) {
+      hasCriticalAlert = true;
+      advices.add('🔴 Cụ đang có biểu hiện đau ngực hoặc khó thở. Hãy ngồi nghỉ ngơi ở nơi thoáng mát, tránh lo lắng. Nếu cơn đau kéo dài hoặc nghiêm trọng hơn, vui lòng gọi điện thoại ngay cho người thân hoặc cơ sở y tế gần nhất!');
+    }
+
+    // Check Overall Feeling (Question 0)
+    final q0Answer = _answers[0];
+    if (q0Answer == 2 || q0Answer == 3) {
+      hasWarning = true;
+      advices.add('🟡 Cơ thể hôm nay cảm thấy không khỏe hoặc mệt mỏi. cụ nên đo lại huyết áp và nhịp tim ngay. Tránh làm việc nặng hoặc ra ngoài trời nắng, dành thời gian nghỉ ngơi yên tĩnh.');
+    }
+
+    // Check Sleep (Question 2)
+    final q2Answer = _answers[2];
+    if (q2Answer == 2 || q2Answer == 3) {
+      hasWarning = true;
+      advices.add('💤 Giấc ngủ tối qua của cụ hơi ít hoặc chập chờn. Hãy bổ sung một giấc ngủ trưa ngắn khoảng 20-30 phút để phục hồi sức khỏe, tránh dùng trà hoặc cà phê vào buổi chiều tối.');
+    } else {
+      advices.add('🟢 Giấc ngủ của Cụ rất tốt, hãy tiếp tục duy trì việc ngủ đủ giấc từ 6-8 tiếng mỗi ngày để giữ tinh thần minh mẫn.');
+    }
+
+    // Check Water (Question 3)
+    final q3Answer = _answers[3];
+    if (q3Answer == 2 || q3Answer == 3) {
+      hasWarning = true;
+      advices.add('💧 Lượng nước uống hôm nay của cụ đang bị thiếu. Hãy rót ngay một cốc nước ấm ấm uống từng ngụm nhỏ, cố gắng bổ sung thêm nước trong ngày.');
+    } else if (q3Answer == 1) {
+      advices.add('💧 Cụ đã uống được khoảng 1L nước. Hãy cố gắng uống thêm 1-2 cốc nước nữa để cơ thể thải độc tốt hơn.');
+    } else {
+      advices.add('💧 Tuyệt vời! Cụ đã uống đủ lượng nước cần thiết cho cơ thể ngày hôm nay.');
+    }
+
+    if (hasCriticalAlert) {
+      statusTitle = 'Cần chú ý đặc biệt!';
+      statusColor = AppTheme.danger;
+      statusIcon = Icons.warning_rounded;
+    } else if (hasWarning) {
+      statusTitle = 'Cần chú ý sức khoẻ';
+      statusColor = AppTheme.warning;
+      statusIcon = Icons.info_rounded;
+    } else {
+      statusTitle = 'Sức khoẻ rất tốt!';
+      statusColor = AppTheme.secondary;
+      statusIcon = Icons.sentiment_very_satisfied_rounded;
+    }
+
+    // If no critical alert and no overall feeling issues, add a positive general advice at the beginning
+    if (!hasCriticalAlert && !hasWarning) {
+      advices.insert(0, '☀️ Trạng thái tinh thần và thể chất của cụ hôm nay rất tốt. Hãy duy trì thói quen đi bộ nhẹ nhàng và trò chuyện cùng người thân nhé!');
+    }
+
+    return {
+      'title': statusTitle,
+      'color': statusColor,
+      'icon': statusIcon,
+      'advices': advices,
+    };
+  }
+
   Widget _buildDone(BuildContext context) {
+    final feedback = _generateHealthFeedback();
+    final String statusTitle = feedback['title'];
+    final Color statusColor = feedback['color'];
+    final IconData statusIcon = feedback['icon'];
+    final List<String> advices = feedback['advices'];
+
     return Scaffold(
       backgroundColor: AppTheme.surface,
+      appBar: AppBar(
+        title: const Text('Kết quả đánh giá'),
+        automaticallyImplyLeading: false,
+      ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF10B981), Color(0xFF059669)],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.secondary.withOpacity(0.35),
-                      blurRadius: 36,
-                      spreadRadius: 8,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                child: Column(
+                  children: [
+                    // Status Badge with glow
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: statusColor, width: 3),
+                      ),
+                      child: Icon(
+                        statusIcon,
+                        color: statusColor,
+                        size: 50,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      statusTitle,
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        color: statusColor,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    
+                    // Advice Card
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppTheme.card,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppTheme.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.spa_rounded, color: statusColor, size: 24),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Lời khuyên dành cho cụ:',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 24, color: AppTheme.divider),
+                          ...advices.map((advice) => Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Text(
+                                  advice,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    height: 1.6,
+                                    color: AppTheme.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              )),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                child:
-                    const Icon(Icons.check_rounded, color: Colors.white, size: 60),
               ),
-              const SizedBox(height: 32),
-              const Text(
-                'Cảm ơn bạn!',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Đánh giá sức khoẻ của bạn đã được ghi nhận.\nHãy tiếp tục chăm sóc bản thân nhé! 💪',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppTheme.textSecondary,
-                  height: 1.6,
-                ),
-              ),
-              const SizedBox(height: 40),
-              ElevatedButton(
+            ),
+            
+            // Bottom Action
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: ElevatedButton(
                 onPressed: widget.onBack,
-                child: const Text('Xem chi tiết sức khoẻ'),
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 60),
+                ),
+                child: const Text('XÁC NHẬN & QUAY LẠI'),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

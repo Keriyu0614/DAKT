@@ -1,7 +1,9 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { healthApi, type HealthLog } from '../../api/health.api';
 import { useAuth } from '../../context/AuthContext';
 import { AlertTriangle, ChevronRight, Plus } from 'lucide-react';
+import { socketService } from '../../services/socket.service';
 
 // Sub-components
 import HealthStatusCard, { type HealthStatus } from '../../components/health/HealthStatusCard';
@@ -12,7 +14,9 @@ import HealthEntryForm from '../../components/health/HealthEntryForm';
 import './HealthPage.css';
 
 export const HealthPage = () => {
-    const { user } = useAuth();
+    const { user, managedElderly } = useAuth();
+    const activeUserId = managedElderly?.id || user?.id;
+    const location = useLocation();
 
     // --- States ---
     const [logs, setLogs] = useState<HealthLog[]>([]);
@@ -24,16 +28,11 @@ export const HealthPage = () => {
     const [editingLog, setEditingLog] = useState<HealthLog | null>(null);
     const [isMounted, setIsMounted] = useState(false);
 
-    // --- Initial Layout Logic ---
-    useEffect(() => {
-        setIsMounted(true);
-        fetchLogs();
-    }, []);
-
-    const fetchLogs = async () => {
+    const fetchLogs = useCallback(async () => {
+        if (!activeUserId) return;
         try {
-            const response = await healthApi.getHealthLogs();
-            const sortedLogs = response.data.sort(
+            const response = await healthApi.getHealthLogs(activeUserId);
+            const sortedLogs = (response.data || []).sort(
                 (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
             );
             setLogs(sortedLogs);
@@ -42,7 +41,48 @@ export const HealthPage = () => {
             console.error(err);
             setFetchError('Không thể tải hồ sơ sức khỏe. Vui lòng thử lại sau.');
         }
-    };
+    }, [activeUserId]);
+
+    // --- Refetch khi navigate tới trang này (React Router SPA) ---
+    useEffect(() => {
+        fetchLogs();
+    }, [location.pathname, fetchLogs]);
+
+    // --- Initial mount + isMounted for chart ---
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    // --- Real-time socket sync + refetch on page visibility ---
+    useEffect(() => {
+        socketService.connect();
+
+        const handleHealthAcknowledged = (data: any) => {
+            console.log('[HealthPage] health_acknowledged received:', data);
+            fetchLogs();
+        };
+
+        const handleHealthLogSubmitted = (data: any) => {
+            console.log('[HealthPage] health_log_submitted received:', data);
+            fetchLogs();
+        };
+
+        socketService.on('health_acknowledged', handleHealthAcknowledged);
+        socketService.on('health_log_submitted', handleHealthLogSubmitted);
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                fetchLogs();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            socketService.off('health_acknowledged', handleHealthAcknowledged);
+            socketService.off('health_log_submitted', handleHealthLogSubmitted);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [fetchLogs]);
 
     // --- derived data ---
     const latestMetrics = useMemo(() => {
@@ -118,10 +158,10 @@ export const HealthPage = () => {
         fetchLogs();
     };
 
-    if (isEntryMode && user) {
+    if (isEntryMode && activeUserId) {
         return (
             <HealthEntryForm
-                userId={user.id}
+                userId={activeUserId}
                 editingLog={editingLog}
                 onClose={() => setIsEntryMode(false)}
                 onSuccess={handleSuccess}

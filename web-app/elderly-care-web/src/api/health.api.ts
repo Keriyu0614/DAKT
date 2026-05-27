@@ -22,12 +22,27 @@ export interface CreateHealthLogPayload {
     heartRate?: number;
     weight?: number;
     note?: string;
+    recordedBy?: string;
 }
 
 export const healthApi = {
-    getHealthLogs: (): Promise<AxiosResponse<HealthLog[]>> =>
-        import.meta.env.DEV ? (healthMockService.getHealthLogs() as any) : axiosClient.get("/api/health-logs"),
+    getHealthLogs: (userId?: string): Promise<AxiosResponse<HealthLog[]>> => {
+        if (!userId || userId === 'undefined') {
+            return Promise.resolve({ data: [] } as any);
+        }
+        return axiosClient.get(`/api/health-logs/user/${userId}`);
+    },
 
     createHealthLog: (payload: CreateHealthLogPayload): Promise<AxiosResponse<HealthLog>> =>
-        import.meta.env.DEV ? (healthMockService.createHealthLog(payload) as any) : axiosClient.post("/api/health-logs", payload),
+        axiosClient.post("/api/health-logs", payload),
+
+    importFromExcel: (userId: string, file: File): Promise<AxiosResponse<{ message: string; importedCount: number; errors?: string[] }>> => {
+        const formData = new FormData();
+        formData.append("file", file);
+        return axiosClient.post(`/api/health-logs/import/${userId}`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
 };

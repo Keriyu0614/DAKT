@@ -1,6 +1,7 @@
 import AppRoutes from "./routes/AppRoutes";
 import { ToastContainer } from "react-toastify";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import EmergencyAlertModal from "./components/emergency/EmergencyAlertModal";
 import "react-toastify/dist/ReactToastify.css";
 
 const GOOGLE_CLIENT_ID = "606890091839-cabq6kfrt1i2pctssr54ctli4no5lhcq.apps.googleusercontent.com";
@@ -11,6 +12,8 @@ export default function App() {
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <AppRoutes />
       <ToastContainer position="top-right" autoClose={3000} />
+      {/* Emergency alert — root level, luôn active bất kể đang ở trang nào */}
+      <EmergencyAlertModal />
     </GoogleOAuthProvider>
   );
 }

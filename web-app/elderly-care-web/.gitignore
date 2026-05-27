@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables (sensitive)
+.env
+.env.local
+.env.*.local
+
+# Build output logs
+build_output.txt
+tsc_errors.txt
+tsc_errors_utf8.txt
+tsc_output.txt

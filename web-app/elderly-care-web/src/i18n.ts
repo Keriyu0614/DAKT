@@ -90,7 +90,20 @@ const resources = {
             "view_profile": "View Profile",
             "no_elderly_found": "No managed relatives found. Please add them in the Elderly Care page.",
             "view_calendar": "View Calendar",
-            "delete_relative": "Delete Relative"
+            "delete_relative": "Delete Relative",
+            "appointment_compliance_audit": "Appointment Compliance Audit",
+            "appointment_compliance_desc": "Ensuring all clinical visits are appropriately supported by reminders.",
+            "total_appointments": "Total Appointments:",
+            "protected_with_reminders": "Protected with Reminders:",
+            "unprotected_risk": "Unprotected (Risk):",
+            "compliance_rate_label": "Compliance Rate:",
+            "delivered_before_appointment": "Delivered Before Appointment:",
+            "no_show_risk_indicator": "No-Show Risk Indicator",
+            "no_show_risk_desc": "Appointments where reminders were generated but missed.",
+            "risk_excellent": "Excellent - No risks detected",
+            "risk_low": "Low risk - Monitor closely",
+            "risk_medium": "Medium risk - Follow up recommended",
+            "risk_high": "High risk - Immediate action required"
         }
     },
     vn: {
@@ -112,7 +125,7 @@ const resources = {
             "upcoming_reminders": "Nhắc nhở sắp tới",
             "calendar": "Lịch",
             "view_all": "Xem tất cả",
-            "health_schedule": "Lịch sức khỏe",
+            "health_schedule": "Lịch cá nhân",
             "med_schedule": "Lịch uống thuốc",
             "appt_schedule": "Lịch khám",
             "manual_input": "Nhập thủ công",
@@ -166,7 +179,7 @@ const resources = {
             "retry": "Thử lại",
             "completed_badge": "Hoàn thành",
             "missed_badge": "Bỏ lỡ",
-            "link_accounts": "Tạo tài khoản người thân",
+            "link_accounts": "Thêm tài khoản người thân",
             "enter_relative_info": "Nhập thông tin người thân",
             "search_placeholder": "Tìm kiếm bằng Email, Tên,...",
             "search_hint": "Ví dụ: user@example.com",
@@ -181,7 +194,20 @@ const resources = {
             "view_profile": "Xem hồ sơ",
             "no_elderly_found": "Chưa có người thân nào được quản lý. Vui lòng thêm ở trang Người cao tuổi.",
             "view_calendar": "Xem lịch",
-            "delete_relative": "Xóa người thân"
+            "delete_relative": "Xóa người thân",
+            "appointment_compliance_audit": "Kiểm tra tuân thủ lịch khám",
+            "appointment_compliance_desc": "Đảm bảo tất cả các lần khám đều được hỗ trợ bởi nhắc nhở phù hợp.",
+            "total_appointments": "Tổng số lịch khám:",
+            "protected_with_reminders": "Được bảo vệ bởi nhắc nhở:",
+            "unprotected_risk": "Chưa được bảo vệ (Rủi ro):",
+            "compliance_rate_label": "Tỷ lệ tuân thủ:",
+            "delivered_before_appointment": "Đã gửi trước lịch khám:",
+            "no_show_risk_indicator": "Chỉ số rủi ro vắng mặt",
+            "no_show_risk_desc": "Lịch khám đã tạo nhắc nhở nhưng bị bỏ lỡ.",
+            "risk_excellent": "Xuất sắc - Không phát hiện rủi ro",
+            "risk_low": "Rủi ro thấp - Theo dõi chặt chẽ",
+            "risk_medium": "Rủi ro trung bình - Khuyến nghị theo dõi",
+            "risk_high": "Rủi ro cao - Cần hành động ngay"
         }
     }
 };

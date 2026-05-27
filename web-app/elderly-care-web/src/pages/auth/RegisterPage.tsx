@@ -18,6 +18,8 @@ export const RegisterPage = () => {
         role: 0 // Default to Elderly
     });
     const [error, setError] = useState('');
+    const [emailExists, setEmailExists] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
     // Handlers
@@ -43,9 +45,16 @@ export const RegisterPage = () => {
             return;
         }
 
+        const passwordRegex = /^(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{6,}$/;
+        if (!passwordRegex.test(formData.password)) {
+            setError('Mật khẩu phải có ít nhất 6 ký tự, bao gồm chữ hoa, số và ký tự đặc biệt.');
+            return;
+        }
+
         try {
             setLoading(true);
             setError('');
+            setEmailExists(false);
 
             await authApi.register({
                 name: formData.fullName,
@@ -54,15 +63,20 @@ export const RegisterPage = () => {
                 role: formData.role
             });
 
-            // Navigate to Login after success
-            alert('Tạo tài khoản thành công! Vui lòng đăng nhập.');
-            navigate('/login');
+            if (formData.role === 0) {
+                setSuccessMessage("Bạn đã đăng ký tài khoản người cao tuổi thành công, bây giờ bạn có thể thực hiện quản lý tài khoản này với tài khoản người chăm sóc của bạn.");
+            } else {
+                alert('Tạo tài khoản thành công! Vui lòng đăng nhập.');
+                navigate('/login');
+            }
         } catch (err: any) {
             console.error(err);
-            setError(
-                err?.response?.data?.message ||
-                'Đăng ký thất bại. Vui lòng thử lại.'
-            );
+            const message = err?.response?.data?.message || '';
+            if (message === 'User already exists') {
+                setEmailExists(true);
+            } else {
+                setError(message || 'Đăng ký thất bại. Vui lòng thử lại.');
+            }
         } finally {
             setLoading(false);
         }
@@ -78,7 +92,15 @@ export const RegisterPage = () => {
         try {
             setLoading(true);
             const response = await authApi.googleLogin(credentialResponse.credential);
-            login(response.data);
+            const data = response.data;
+
+            // Chặn Elderly login Web
+            if (data.role === "Elderly" || data.role === "0" || data.role === 0 as any) {
+                setError("Tài khoản người cao tuổi chỉ có thể đăng nhập trên ứng dụng điện thoại.");
+                return;
+            }
+
+            login(data, true);
             navigate("/app");
             toast.success("Đăng nhập bằng Google thành công!");
         } catch (err: any) {
@@ -89,13 +111,37 @@ export const RegisterPage = () => {
         }
     };
 
+    if (successMessage) {
+        return (
+            <div style={styles.container}>
+                <div style={styles.card}>
+                    <h1 style={styles.title}>Đăng ký thành công</h1>
+                    <p style={styles.subtitle}>{successMessage}</p>
+                    <button onClick={handleBackToLogin} style={styles.registerButton}>
+                        Quay về trang đăng nhập
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div style={styles.container}>
             <div style={styles.card}>
+                <img src="/CareLink.png" alt="CareLink" style={styles.logo} />
                 <h1 style={styles.title}>Tạo Tài Khoản</h1>
                 <p style={styles.subtitle}>Đăng ký tài khoản mới để bắt đầu sử dụng hệ thống</p>
 
                 {error && <div style={styles.errorBox}>{error}</div>}
+
+                {emailExists && (
+                    <div style={styles.emailExistsBox}>
+                        <span>Email này đã được đăng ký. </span>
+                        <button onClick={handleBackToLogin} style={styles.loginSuggestionLink}>
+                            Đăng nhập ngay?
+                        </button>
+                    </div>
+                )}
 
                 <form onSubmit={handleRegister} style={styles.form}>
                     <div style={styles.formGroup}>
@@ -180,7 +226,6 @@ export const RegisterPage = () => {
                         onError={() => toast.error("Đăng nhập Google thất bại")}
                         theme="outline"
                         shape="pill"
-                        width="100%"
                     />
                 </div>
 
@@ -213,6 +258,12 @@ const styles: Record<string, React.CSSProperties> = {
         width: '100%',
         maxWidth: '500px',
         textAlign: 'center',
+    },
+    logo: {
+        height: '72px',
+        width: 'auto',
+        objectFit: 'contain' as const,
+        marginBottom: '12px',
     },
     title: {
         fontSize: '36px',
@@ -313,5 +364,29 @@ const styles: Record<string, React.CSSProperties> = {
         display: "flex",
         justifyContent: "center",
         marginTop: "10px",
+    },
+    emailExistsBox: {
+        backgroundColor: '#fff3cd',
+        color: '#856404',
+        padding: '15px',
+        borderRadius: '8px',
+        marginBottom: '20px',
+        fontSize: '16px',
+        border: '1px solid #ffc107',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '4px',
+        flexWrap: 'wrap' as const,
+        justifyContent: 'center',
+    },
+    loginSuggestionLink: {
+        background: 'none',
+        border: 'none',
+        color: '#2980B9',
+        fontSize: '16px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        textDecoration: 'underline',
+        padding: 0,
     },
 };

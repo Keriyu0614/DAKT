@@ -3,7 +3,8 @@ import {
     notificationApi,
     type Notification,
     type NotificationDetail,
-    NotificationStatus
+    NotificationStatus,
+    SourceEventType
 } from '../../api/notification.api';
 import { useAuth } from '../../context/AuthContext';
 import NotificationCard from '../../components/notification/NotificationCard';
@@ -13,14 +14,18 @@ import {
     CheckCircle2,
     Clock as ClockIcon,
     ChevronDown,
-    ChevronUp
+    ChevronUp,
+    Wifi,
+    WifiOff
 } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { socketService } from '../../services/socket.service';
 import './NotificationsPage.css';
 
 export const NotificationsPage = () => {
     // --- Auth ---
-    const { user } = useAuth();
+    const { user, managedElderly } = useAuth();
+    const activeUserId = managedElderly?.id || user?.id;
 
     // --- State ---
     const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -30,27 +35,97 @@ export const NotificationsPage = () => {
     const [detailModal, setDetailModal] = useState<NotificationDetail | null>(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [actioningId, setActioningId] = useState<string | null>(null);
+    const [isSocketConnected, setIsSocketConnected] = useState(false);
 
     // --- Data Fetching ---
     useEffect(() => {
-        if (user?.id) {
-            fetchNotifications(); // Initial load
+        if (activeUserId) {
+            fetchNotifications();
 
-            // Auto-refresh every 5 seconds
-            const intervalId = setInterval(() => {
-                fetchNotifications(true); // Silent refresh
+            // Connect to socket for real-time updates
+            socketService.connect();
+            setIsSocketConnected(socketService.isConnected());
+
+            // Listen for socket events
+            const handleStatusUpdate = (data: any) => {
+                console.log('Socket: status_updated', data);
+                // Refresh notifications when reminder status changes
+                fetchNotifications(true);
+            };
+
+            const handleNotificationCreated = (data: any) => {
+                console.log('Socket: notification_created', data);
+                // Check if notification is for current user
+                if (data.userId === activeUserId) {
+                    // Show toast notification
+                    const notification = data.notification;
+                    if (notification?.title) {
+                        toast.info(`🔔 ${notification.title}`, {
+                            position: 'top-right',
+                            autoClose: 5000,
+                        });
+                    }
+                    // Refresh notifications list
+                    fetchNotifications(true);
+                }
+            };
+
+            const handleMedicationSnoozed = (data: any) => {
+                console.log('Socket: medication_snoozed_event', data);
+                // Refresh notifications when medication is snoozed
+                fetchNotifications(true);
+            };
+
+            const handleMedicationMissed = (data: any) => {
+                console.log('Socket: medication_missed', data);
+                // Refresh notifications when medication is missed
+                fetchNotifications(true);
+            };
+
+            const handleHealthLogSubmitted = (data: any) => {
+                console.log('Socket: health_log_submitted', data);
+                // Refresh notifications when elderly submits health log
+                fetchNotifications(true);
+                toast.info('📋 Người thân vừa tự ghi chỉ số sức khỏe', {
+                    position: 'top-right',
+                    autoClose: 5000,
+                });
+            };
+
+            socketService.on('status_updated', handleStatusUpdate);
+            socketService.on('notification_created', handleNotificationCreated);
+            socketService.on('medication_snoozed_event', handleMedicationSnoozed);
+            socketService.on('medication_missed', handleMedicationMissed);
+            socketService.on('health_log_submitted', handleHealthLogSubmitted);
+
+            // Check connection status periodically
+            const connectionCheckInterval = setInterval(() => {
+                setIsSocketConnected(socketService.isConnected());
             }, 5000);
 
-            return () => clearInterval(intervalId);
+            // Auto-refresh every 60 seconds as fallback
+            const intervalId = setInterval(() => {
+                fetchNotifications(true);
+            }, 60000);
+
+            return () => {
+                clearInterval(intervalId);
+                clearInterval(connectionCheckInterval);
+                socketService.off('status_updated', handleStatusUpdate);
+                socketService.off('notification_created', handleNotificationCreated);
+                socketService.off('medication_snoozed_event', handleMedicationSnoozed);
+                socketService.off('medication_missed', handleMedicationMissed);
+                socketService.off('health_log_submitted', handleHealthLogSubmitted);
+            };
         }
-    }, [user?.id]);
+    }, [activeUserId]);
 
     const fetchNotifications = async (isSilent = false) => {
-        if (!user?.id) return;
+        if (!activeUserId) return;
 
         if (!isSilent) setLoading(true);
         try {
-            const response = await notificationApi.getNotifications(user.id);
+            const response = await notificationApi.getNotifications(activeUserId);
             const sorted = response.data.sort(
                 (a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime()
             );
@@ -129,7 +204,27 @@ export const NotificationsPage = () => {
 
         setActioningId(notif.id);
         try {
-            await notificationApi.acknowledge(notif.id);
+            // If this is a Health notification, use the dedicated health-acknowledge endpoint
+            const isHealthNotif = notif.sourceEventType === SourceEventType.Health
+                || notif.title.toLowerCase().includes('chỉ số')
+                || notif.title.toLowerCase().includes('sức khỏe')
+                || notif.title.toLowerCase().includes('tự ghi')
+                || notif.title.toLowerCase().includes('cảnh báo chỉ số');
+
+            if (isHealthNotif) {
+                await notificationApi.acknowledgeHealth(notif.id);
+                // Emit socket event so HealthPage refreshes in real-time
+                socketService.emit('health_acknowledged', {
+                    notificationId: notif.id,
+                    userId: notif.userId,
+                    sourceEventId: notif.sourceEventId,
+                });
+                toast.success('Đã xác nhận — chỉ số đã được cập nhật vào hồ sơ sức khỏe');
+            } else {
+                await notificationApi.acknowledge(notif.id);
+                toast.success('Đã xác nhận');
+            }
+
             setNotifications(prev =>
                 prev.map(n =>
                     n.id === notif.id
@@ -137,7 +232,6 @@ export const NotificationsPage = () => {
                         : n
                 )
             );
-            toast.success('Đã xác nhận');
         } catch (err) {
             toast.error('Lỗi khi xác nhận');
             console.error(err);
@@ -242,6 +336,19 @@ export const NotificationsPage = () => {
                     <div>
                         <h1><Bell size={32} /> Thông Báo</h1>
                         <p>Cảnh báo được gửi từ hệ thống về nhắc nhở và sự kiện chăm sóc</p>
+                    </div>
+                    <div className="connection-status">
+                        {isSocketConnected ? (
+                            <span className="status-badge connected">
+                                <Wifi size={16} />
+                                Đang kết nối
+                            </span>
+                        ) : (
+                            <span className="status-badge disconnected">
+                                <WifiOff size={16} />
+                                Mất kết nối
+                            </span>
+                        )}
                     </div>
                 </div>
             </header>

@@ -63,6 +63,9 @@ using (var scope = app.Services.CreateScope())
         logger.LogInformation("Applying database migrations...");
         context.Database.Migrate();
         logger.LogInformation("Database migrations applied successfully.");
+        
+        // Seed initial data
+        AuthService.Data.DataSeeder.SeedData(context, logger);
     }
     catch (Exception ex)
     {

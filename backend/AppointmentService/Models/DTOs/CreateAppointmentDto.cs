@@ -23,9 +23,8 @@ public class CreateAppointmentDto
     /// <summary>
     /// Location of the appointment
     /// </summary>
-    [Required]
-    [StringLength(500, MinimumLength = 1)]
-    public string Location { get; set; } = string.Empty;
+    [StringLength(500)]
+    public string? Location { get; set; }
 
     /// <summary>
     /// Date and time of the appointment

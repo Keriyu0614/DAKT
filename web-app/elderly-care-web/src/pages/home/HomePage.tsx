@@ -6,7 +6,6 @@ import {
     Activity,
     Smartphone,
     Layout,
-    ShieldCheck,
     UserCheck,
     ArrowRight
 } from 'lucide-react';
@@ -22,7 +21,7 @@ export const HomePage = () => {
             {/* Header */}
             <header className="homepage-header">
                 <div className="logo-container">
-                    <Heart size={22} fill="#0ea5e9" stroke="#0ea5e9" />
+                    <img src="/CareLink.png" alt="CareLink" style={{ height: '32px', objectFit: 'contain' }} />
                     <span>CareLink</span>
                 </div>
                 <nav className="nav-links">
@@ -224,7 +223,7 @@ export const HomePage = () => {
                 <div className="footer-content">
                     <div>
                         <div className="footer-logo">
-                            <Heart size={18} fill="white" stroke="white" /> CareLink
+                            <img src="/CareLink.png" alt="CareLink" style={{ height: '24px', objectFit: 'contain', filter: 'brightness(0) invert(1)' }} />
                         </div>
                         <p>Trao quyền cho người chăm sóc, hỗ trợ người cao tuổi.</p>
                     </div>

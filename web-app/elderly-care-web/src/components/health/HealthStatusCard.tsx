@@ -20,9 +20,9 @@ const HealthStatusCard = ({ type, value, status }: HealthStatusCardProps) => {
 
     const getLabel = () => {
         switch (type) {
-            case 'bloodPressure': return 'Blood Pressure';
-            case 'heartRate': return 'Heart Rate';
-            case 'weight': return 'Weight';
+            case 'bloodPressure': return 'Huyết Áp';
+            case 'heartRate': return 'Nhịp Tim';
+            case 'weight': return 'Cân Nặng';
         }
     };
 

@@ -130,7 +130,21 @@
   color: #334155;
 }
 
-.week-days {
+.month-days-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.day-header-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.month-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 0.25rem;
@@ -147,13 +161,11 @@
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s;
+  position: relative;
 }
 
-.day-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #94a3b8;
-  text-transform: uppercase;
+.day-btn.other-month {
+  opacity: 0.3;
 }
 
 .day-date {
@@ -166,6 +178,15 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+}
+
+.day-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #f59e0b;
+  position: absolute;
+  bottom: 2px;
 }
 
 .day-btn.today .day-date {
@@ -258,6 +279,36 @@
   color: #ef4444;
 }
 
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.action-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.action-icon-btn:hover {
+  background: #f1f5f9;
+  color: #0284c7;
+}
+
+.action-icon-btn.delete:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
 .empty-msg {
   text-align: center;
   color: #94a3b8;
@@ -345,4 +396,36 @@
   .schedule-body {
     grid-template-columns: 1fr;
   }
+}
+
+/* Import info card (replaces old upload zone) */
+.import-info-card {
+  background: #f8fafc;
+  border: 1.5px dashed #93c5fd;
+  border-radius: 14px;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.import-info-card .import-info-icon {
+  color: #0284c7;
+  opacity: 0.7;
+}
+
+.import-info-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.import-info-card p {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
 }

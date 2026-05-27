@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-    Download,
+    //Download,
     Calendar,
     Activity,
     Pill,
@@ -9,7 +9,7 @@ import {
     Bell,
     FileJson,
     FileSpreadsheet,
-    ChevronDown
+   // ChevronDown
 } from 'lucide-react';
 import { reportApi } from '../../api/report.api';
 import { exportHelpers } from '../../utils/report.export';
@@ -24,9 +24,13 @@ import MedicationAdherenceSection from '../../components/report/MedicationAdhere
 import AppointmentComplianceSection from '../../components/report/AppointmentComplianceSection';
 import SystemHealthSection from '../../components/report/SystemHealthSection';
 
+import { useAuth } from '../../context/AuthContext';
 import './ReportPage.css';
 
 export const ReportPage = () => {
+    const { user, managedElderly } = useAuth();
+    const activeUserId = managedElderly?.id || user?.id;
+
     const [range, setRange] = useState<TimeRange>('7d');
     const [data, setData] = useState<ComprehensiveReport | null>(null);
     const [loading, setLoading] = useState(true);
@@ -34,12 +38,12 @@ export const ReportPage = () => {
 
     useEffect(() => {
         fetchReportData();
-    }, [range]);
+    }, [range, activeUserId]);
 
     const fetchReportData = async () => {
         setLoading(true);
         try {
-            const report = await reportApi.generateReport(range);
+            const report = await reportApi.generateReport(range, activeUserId);
             setData(report);
         } catch (error) {
             console.error('Lỗi tải dữ liệu báo cáo', error);
@@ -102,9 +106,9 @@ export const ReportPage = () => {
                     </div>
 
                     <div className="export-dropdown">
-                        <button className="export-main-btn">
+                        {/* <button className="export-main-btn">
                             <Download size={18} /> Xuất <ChevronDown size={14} />
-                        </button>
+                        </button> */}
                         <div className="export-menu">
                             <button onClick={() => handleExport('pdf')}><CheckCircle2 size={16} /> Tóm tắt PDF</button>
                             <button onClick={() => handleExport('csv')}><FileSpreadsheet size={16} /> Dữ liệu CSV</button>
@@ -119,7 +123,6 @@ export const ReportPage = () => {
 
             {/* 3. Report Categories Tabs */}
             <nav className="report-tabs">
-                <button className={activeTab === 'reminders' ? 'active' : ''} onClick={() => setActiveTab('reminders')}></button>
                 <button className={activeTab === 'reminders' ? 'active' : ''} onClick={() => setActiveTab('reminders')}>
                     <Bell size={18} /> Hiệu Suất Nhắc Nhở
                 </button>

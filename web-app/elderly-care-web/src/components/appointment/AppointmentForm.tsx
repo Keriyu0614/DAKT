@@ -159,11 +159,17 @@ const AppointmentForm = ({
             return;
         }
 
+        // Validate userId
+        if (!userId) {
+            toast.error('Không thể tạo lịch khám: Thiếu thông tin người dùng. Vui lòng đăng nhập lại.');
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const dateTime = new Date(`${formData.appointmentDate}T${formData.appointmentTime}`);
             const payload: CreateAppointmentPayload = {
-                userId: userId || undefined,
+                userId: userId,
                 doctorName: formData.doctorName,
                 location: formData.location,
                 appointmentDate: dateTime.toISOString(),
@@ -187,8 +193,9 @@ const AppointmentForm = ({
             onSuccess();
             onClose();
             resetForm();
-        } catch (err) {
-            toast.error('Lỗi khi lưu lịch khám. Vui lòng thử lại.');
+        } catch (err: any) {
+            const errorMessage = err?.response?.data?.message || 'Lỗi khi lưu lịch khám. Vui lòng thử lại.';
+            toast.error(errorMessage);
             console.error(err);
         } finally {
             setIsSubmitting(false);

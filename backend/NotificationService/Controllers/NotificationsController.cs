@@ -228,6 +228,40 @@ public class NotificationsController : ControllerBase
     // - DELETE /api/notifications/{id} - Deletion not allowed (audit trail)
 
     /// <summary>
+    /// STATE TRANSITION: Read → Acknowledged + auto-sync health log to HealthTrackingService
+    /// When caregiver acknowledges a Health notification, the health log is already saved
+    /// (recorded by elderly). This endpoint just marks the notification as acknowledged
+    /// and emits a socket event so the web HealthPage refreshes automatically.
+    /// </summary>
+    [HttpPatch("{id}/acknowledge-health")]
+    public async Task<ActionResult<NotificationSummaryDto>> AcknowledgeHealth(Guid id)
+    {
+        try
+        {
+            var notification = await _notificationService.AcknowledgeAsync(id);
+
+            if (notification == null)
+                return NotFound(new { message = $"Notification {id} not found" });
+
+            _logger.LogInformation(
+                "Health notification {NotificationId} acknowledged. SourceEventId={SourceEventId}",
+                id, notification.SourceReminderId);
+
+            return Ok(notification);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Invalid state transition for health notification {NotificationId}", id);
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error acknowledging health notification {NotificationId}", id);
+            return StatusCode(500, new { message = "An error occurred while acknowledging health notification" });
+        }
+    }
+
+    /// <summary>
     /// INTERNAL SYSTEM ENDPOINT: Create notification from system event
     /// 
     /// CRITICAL: NOT exposed to public/user API

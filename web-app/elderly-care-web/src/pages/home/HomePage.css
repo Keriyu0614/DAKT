@@ -142,41 +142,42 @@
   align-items: center;
   justify-content: space-between;
   padding: 5rem 6%;
-  background: linear-gradient(150deg, #f0f9ff 0%, #e0f2fe 40%, #fafffe 100%);
   min-height: 88vh;
   gap: 4rem;
   position: relative;
   overflow: hidden;
+  /* Ảnh nền nen.jpg */
+  background-image: url('/nen.jpg');
+  background-size: cover;
+  background-position: center right;
+  background-repeat: no-repeat;
 }
 
+/* Overlay gradient trắng từ trái sang phải — giúp text dễ đọc */
 .hero-section::before {
   content: '';
   position: absolute;
-  top: -80px;
-  right: -80px;
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.12) 0%, transparent 70%);
-  border-radius: 50%;
+  inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(240, 249, 255, 0.97) 0%,
+    rgba(224, 242, 254, 0.92) 35%,
+    rgba(240, 249, 255, 0.55) 60%,
+    rgba(255, 255, 255, 0.0) 100%
+  );
   pointer-events: none;
+  z-index: 0;
 }
 
 .hero-section::after {
-  content: '';
-  position: absolute;
-  bottom: -60px;
-  left: -60px;
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
-  border-radius: 50%;
-  pointer-events: none;
+  display: none;
 }
 
 .hero-content {
   flex: 1;
   max-width: 580px;
   z-index: 1;
+  position: relative;
 }
 
 .hero-badge {
@@ -813,6 +814,17 @@
     text-align: center;
     padding: 3rem 5%;
     min-height: auto;
+    background-position: center center;
+  }
+
+  /* Overlay đậm hơn trên mobile để text luôn đọc được */
+  .hero-section::before {
+    background: linear-gradient(
+      to bottom,
+      rgba(240, 249, 255, 0.96) 0%,
+      rgba(224, 242, 254, 0.90) 60%,
+      rgba(240, 249, 255, 0.75) 100%
+    );
   }
 
   .hero-buttons {

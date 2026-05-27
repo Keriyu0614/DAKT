@@ -12,9 +12,7 @@ interface AddElderlyModalProps {
 
 const AddElderlyModal: React.FC<AddElderlyModalProps> = ({ isOpen, onClose, onSuccess }) => {
     const { user } = useAuth();
-    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
 
     if (!isOpen) return null;
@@ -25,22 +23,19 @@ const AddElderlyModal: React.FC<AddElderlyModalProps> = ({ isOpen, onClose, onSu
 
         try {
             setLoading(true);
-            await authApi.createElderly({
-                name,
+            await authApi.linkElderly({
                 email,
-                password,
                 caregiverId: user.id
             });
-            toast.success('Tạo và liên kết tài khoản thành công!');
+            toast.success('Liên kết tài khoản thành công!');
             onSuccess();
             onClose();
             // Clear form
-            setName('');
             setEmail('');
-            setPassword('');
         } catch (err: any) {
             console.error(err);
-            toast.error(err?.response?.data?.message || 'Không thể tạo tài khoản');
+            const msg = err?.response?.data?.message || 'Không thể liên kết tài khoản';
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
@@ -50,7 +45,7 @@ const AddElderlyModal: React.FC<AddElderlyModalProps> = ({ isOpen, onClose, onSu
         <div style={styles.overlay}>
             <div style={styles.modal}>
                 <div style={styles.header}>
-                    <h2>Thêm tài khoản người cao tuổi</h2>
+                    <h2>Liên kết tài khoản người cao tuổi</h2>
                     <button onClick={onClose} style={styles.closeBtn}>
                         <X size={24} />
                     </button>
@@ -58,18 +53,7 @@ const AddElderlyModal: React.FC<AddElderlyModalProps> = ({ isOpen, onClose, onSu
 
                 <form onSubmit={handleSubmit} style={styles.form}>
                     <div style={styles.formGroup}>
-                        <label>Họ và tên</label>
-                        <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
-                            placeholder="Nhập tên người cao tuổi"
-                        />
-                    </div>
-
-                    <div style={styles.formGroup}>
-                        <label>Email</label>
+                        <label>Email tài khoản cần liên kết</label>
                         <input
                             type="email"
                             value={email}
@@ -79,23 +63,12 @@ const AddElderlyModal: React.FC<AddElderlyModalProps> = ({ isOpen, onClose, onSu
                         />
                     </div>
 
-                    <div style={styles.formGroup}>
-                        <label>Mật khẩu</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            placeholder="Nhập mật khẩu"
-                        />
-                    </div>
-
                     <div style={styles.actions}>
                         <button type="button" onClick={onClose} style={styles.cancelBtn}>
                             Hủy
                         </button>
                         <button type="submit" disabled={loading} style={styles.submitBtn}>
-                            {loading ? 'Đang tạo...' : 'Tạo và liên kết'}
+                            {loading ? 'Đang liên kết...' : 'Liên kết'}
                         </button>
                     </div>
                 </form>

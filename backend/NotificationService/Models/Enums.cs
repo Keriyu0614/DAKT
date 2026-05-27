@@ -96,5 +96,6 @@ public enum SourceEventType
 {
     Medication = 0,
     Appointment = 1,
-    Health = 2
+    Health = 2,
+    Emergency = 3
 }

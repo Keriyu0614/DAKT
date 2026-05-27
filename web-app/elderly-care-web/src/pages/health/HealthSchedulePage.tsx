@@ -1,20 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
-import { Upload, Plus, ChevronLeft, ChevronRight, CheckCircle2, Clock, User } from 'lucide-react';
+import { Upload, Plus, ChevronLeft, ChevronRight, CheckCircle2, Clock, User, Edit2, Trash2, FileSpreadsheet } from 'lucide-react';
 import { medicationService } from '../../services/medication.service';
 import { type Medication } from '../../api/medication.api';
 import { appointmentApi } from '../../api/appointment.api';
 import { reminderApi, type Reminder } from '../../api/reminder.api';
+import { medicationApi } from '../../api/medication.api';
 import MedicationForm from '../../components/medication/MedicationForm';
 import AppointmentForm from '../../components/appointment/AppointmentForm';
-import { io } from 'socket.io-client';
+import { useAuth } from '../../context/AuthContext';
+import { socketService } from '../../services/socket.service';
+import { ImportExcelModal } from '../../components/import/ImportExcelModal';
+//import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import './HealthSchedulePage.css';
 
 type Tab = 'medication' | 'appointment';
 
-// Appointment type gộp cả mock (dateTime) lẫn real API (appointmentDate)
 interface AppointmentItem {
   id: string;
   doctorName: string;
@@ -22,21 +25,42 @@ interface AppointmentItem {
   location: string;
   notes?: string;
   status?: string;
-  appointmentDate: string; // chuẩn hoá về đây
+  appointmentDate: string;
+}
+
+interface SocketStatusData {
+  reminderId: string;
+  status: number;
+  updatedReminder?: { scheduledTime: string };
 }
 
 const DAYS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
-function getWeekDates(offset: number): Date[] {
+function getMonthDates(offset: number): Date[] {
   const now = new Date();
-  const day = now.getDay();
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d;
-  });
+  const targetMonth = now.getMonth() + offset;
+  const firstDay = new Date(now.getFullYear(), targetMonth, 1);
+  const lastDay = new Date(now.getFullYear(), targetMonth + 1, 0);
+  
+  const dates: Date[] = [];
+  
+  let dayOfWeek = firstDay.getDay();
+  let startOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  
+  for (let i = startOffset; i > 0; i--) {
+    dates.push(new Date(firstDay.getFullYear(), firstDay.getMonth(), 1 - i));
+  }
+  
+  for (let i = 1; i <= lastDay.getDate(); i++) {
+    dates.push(new Date(firstDay.getFullYear(), firstDay.getMonth(), i));
+  }
+  
+  const remaining = Math.ceil(dates.length / 7) * 7 - dates.length;
+  for (let i = 1; i <= remaining; i++) {
+    dates.push(new Date(lastDay.getFullYear(), lastDay.getMonth() + 1, i));
+  }
+  
+  return dates;
 }
 
 function isSameDay(a: Date, b: Date) {
@@ -49,57 +73,62 @@ function formatTime(timeStr: string): string {
   if (!timeStr) return '';
   if (timeStr.includes('T') || timeStr.length > 8) {
     const d = new Date(timeStr);
-    return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const h = d.getHours();
+    const m = d.getMinutes();
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    const ampm = h >= 12 ? 'CH' : 'SA';
+    return `${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
   }
   const [h, m] = timeStr.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
+  const ampm = h >= 12 ? 'CH' : 'SA';
   const hour = h % 12 || 12;
   return `${String(hour).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
 export const HealthSchedulePage = () => {
   const { t, i18n } = useTranslation();
+  const { user, managedElderly } = useAuth();
   const [searchParams] = useSearchParams();
   const targetUserId = searchParams.get('id');
   const targetUserName = searchParams.get('name');
+  
+  // Use targetUserId from URL, or fall back to managedElderly or current user
+  const activeUserId = targetUserId || managedElderly?.id || user?.id;
 
   const [activeTab, setActiveTab] = useState<Tab>('medication');
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [selectedDayIndex, setSelectedDayIndex] = useState(() => {
-    const d = new Date().getDay();
-    return d === 0 ? 6 : d - 1;
-  });
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [selectedDateState, setSelectedDateState] = useState<Date>(new Date());
 
   const [medications, setMedications] = useState<Medication[]>([]);
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Form states
   const [showMedForm, setShowMedForm] = useState(false);
   const [showApptForm, setShowApptForm] = useState(false);
+  const [editMedId, setEditMedId] = useState<string | null>(null);
+  const [editAppt, setEditAppt] = useState<AppointmentItem | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importType, setImportType] = useState<'medication' | 'appointment'>('medication');
 
-  const weekDates = getWeekDates(weekOffset);
-  const selectedDate = weekDates[selectedDayIndex];
+  const monthDates = getMonthDates(monthOffset);
+  const selectedDate = selectedDateState;
 
   // ─── Data Fetching ───────────────────────────────────────────────────────────
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [medsData, apptsRes, remindersRes] = await Promise.all([
-        medicationService.getMedications(targetUserId || undefined),
-        appointmentApi.getAll(targetUserId || undefined),
-        reminderApi.getReminders(targetUserId || undefined).catch(() => ({ data: [] }))
+        medicationService.getMedications(activeUserId || undefined),
+        appointmentApi.getAll(activeUserId || undefined),
+        reminderApi.getReminders(activeUserId || undefined).catch(() => ({ data: [] }))
       ]);
 
       setMedications(medsData);
       setReminders(remindersRes.data || []);
 
-      // Normalise appointments: handle both `appointmentDate` and mock `dateTime`
       const apptsArray = Array.isArray(apptsRes.data) ? apptsRes.data : [];
       const normalised: AppointmentItem[] = apptsArray.map(apt => ({
         id: apt.id,
@@ -117,45 +146,48 @@ export const HealthSchedulePage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeUserId, t]);
 
   useEffect(() => {
     fetchData();
-  }, [targetUserId]);
+  }, [fetchData]);
 
+  // ─── Socket ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const socket = io("http://localhost:5006");
+    socketService.connect();
 
-    socket.on("status_updated", (data: any) => {
-      console.log("Socket status_updated received in HealthSchedule:", data);
-      setReminders(prev => prev.map(r => 
-        r.id === data.reminderId ? { ...r, status: 1 } : r
+    const handleStatusUpdated = (data: SocketStatusData) => {
+      console.log('Socket status_updated received in HealthSchedule:', data);
+      console.log('Current reminders:', reminders.map(r => ({ id: r.id, status: r.status })));
+      const status = (typeof data.status === 'number' ? data.status : 1) as 0 | 1 | 2;
+      setReminders(prev => prev.map(r =>
+          r.id === data.reminderId ? { ...r, status } : r
       ));
-    });
+      fetchData();
+  };
 
-    socket.on("medication_missed", (data: any) => {
-      console.log("Socket medication_missed received in HealthSchedule:", data);
-      setReminders(prev => prev.map(r => 
-        r.id === data.reminderId ? { ...r, status: 2 } : r
-      ));
-      
-      toast.error(
-        `⚠️ Cảnh báo: Người thân đã bỏ lỡ lịch uống thuốc lúc ${
-          data.updatedReminder?.scheduledTime
-            ? new Date(data.updatedReminder.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : ''
-        }!`,
-        {
-          position: "top-right",
-          autoClose: 10000,
-        }
-      );
-    });
+    const handleMedicationMissed = (data: SocketStatusData) => {
+        console.log('Socket medication_missed received in HealthSchedule:', data);
+        setReminders(prev => prev.map(r =>
+            r.id === data.reminderId ? { ...r, status: 2 as 0 | 1 | 2 } : r
+        ));
+        fetchData();
+        toast.error(
+            `⚠️ Cảnh báo: Người thân đã bỏ lỡ lịch uống thuốc lúc ${data.updatedReminder?.scheduledTime
+                ? new Date(data.updatedReminder.scheduledTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                : ''}!`,
+            { position: 'top-right', autoClose: 10000 }
+        );
+    };
+
+    socketService.on('status_updated', handleStatusUpdated);
+    socketService.on('medication_missed', handleMedicationMissed);
 
     return () => {
-      socket.disconnect();
+        socketService.off('status_updated', handleStatusUpdated);
+        socketService.off('medication_missed', handleMedicationMissed);
     };
-  }, []);
+}, [fetchData]);
 
   const getMedReminderStatusInfo = (medId: string, time: string) => {
     const [hour, minute] = time.split(':').map(Number);
@@ -167,69 +199,77 @@ export const HealthSchedulePage = () => {
       if (rem.referenceId !== medId) return false;
       const rTime = new Date(rem.scheduledTime);
       return rTime.getFullYear() === targetDate.getFullYear() &&
-             rTime.getMonth() === targetDate.getMonth() &&
-             rTime.getDate() === targetDate.getDate() &&
-             rTime.getHours() === targetDate.getHours() &&
-             rTime.getMinutes() === targetDate.getMinutes();
+        rTime.getMonth() === targetDate.getMonth() &&
+        rTime.getDate() === targetDate.getDate() &&
+        rTime.getHours() === targetDate.getHours() &&
+        rTime.getMinutes() === targetDate.getMinutes();
     });
 
-    if (!r) {
-      return { text: '🟡 Đang chờ', className: 'pending' };
-    }
-
-    if (r.status === 1) {
-      return { text: '🟢 Đã xong', className: 'done' };
-    } else if (r.status === 2) {
-      return { text: '🔴 Bỏ lỡ', className: 'missed' };
-    } else {
-      return { text: '🟡 Đang chờ', className: 'pending' };
-    }
+    if (!r) return { text: '🟡 Đang chờ', className: 'pending' };
+    if (r.status === 1) return { text: '🟢 Đã xong', className: 'done' };
+    if (r.status === 2) return { text: '🔴 Bỏ lỡ', className: 'missed' };
+    return { text: '🟡 Đang chờ', className: 'pending' };
   };
 
   // ─── Filter by selected day ──────────────────────────────────────────────────
-
-  // Thuốc: hiển thị nếu ngày chọn nằm trong khoảng startDate–endDate và status Active
   const todayMeds = medications.filter(med => {
     if (med.status !== 'Active') return false;
-    const start = new Date(med.startDate);
-    start.setHours(0, 0, 0, 0);
-    const end = med.endDate ? new Date(med.endDate) : null;
-    if (end) end.setHours(23, 59, 59, 999);
+    // Parse date-only (yyyy-MM-dd) to avoid UTC→local timezone shift
+    const startStr = med.startDate.substring(0, 10); // "2026-06-01"
+    const [sy, sm, sd] = startStr.split('-').map(Number);
+    const start = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+
+    let end: Date | null = null;
+    if (med.endDate) {
+      const endStr = med.endDate.substring(0, 10);
+      const [ey, em, ed] = endStr.split('-').map(Number);
+      end = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+    }
+
     const sel = new Date(selectedDate);
     sel.setHours(12, 0, 0, 0);
     return sel >= start && (!end || sel <= end);
   });
 
-  // Lịch khám: so sánh cùng ngày
   const todayApts = appointments.filter(apt => {
     if (!apt.appointmentDate) return false;
     return isSameDay(new Date(apt.appointmentDate), selectedDate);
   });
 
-  // ─── Lấy danh sách giờ uống từ Medication ───────────────────────────────────
+  // Sort medications by time (newest first - descending order)
+  const sortedTodayMeds = todayMeds.flatMap(med =>
+    getMedTimes(med).map((time, idx) => ({
+      med,
+      time,
+      idx,
+      timeValue: time
+    }))
+  ).sort((a, b) => {
+    // Parse time strings for comparison (HH:MM format)
+    const [aHour, aMin] = a.timeValue.split(':').map(Number);
+    const [bHour, bMin] = b.timeValue.split(':').map(Number);
+    const aMinutes = aHour * 60 + aMin;
+    const bMinutes = bHour * 60 + bMin;
+    return bMinutes - aMinutes; // Descending order (newest first)
+  });
+
+  // Sort appointments by time (newest first - descending order)
+  const sortedTodayApts = todayApts.sort((a, b) => {
+    const aTime = new Date(a.appointmentDate).getTime();
+    const bTime = new Date(b.appointmentDate).getTime();
+    return bTime - aTime; // Descending order (newest first)
+  });
+
   function getMedTimes(med: Medication): string[] {
     if (med.frequency?.specificTimes?.length) {
       return med.frequency.specificTimes;
     }
-    // fallback: chia đều theo timesPerDay
     const count = med.frequency?.timesPerDay ?? 1;
     const defaults = ['08:00', '12:00', '18:00', '21:00'];
     return defaults.slice(0, count);
   }
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
-  const handleFileDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) setSelectedFile(file);
-  };
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) setSelectedFile(file);
-  };
-
   function isAptDone(status?: string) {
     if (!status) return false;
     return status === 'Completed' || status === 'completed';
@@ -237,16 +277,100 @@ export const HealthSchedulePage = () => {
 
   const handleManualInput = () => {
     if (activeTab === 'medication') {
+      setEditMedId(null);
       setShowMedForm(true);
     } else {
+      setEditAppt(null);
       setShowApptForm(true);
+    }
+  };
+
+  const handleOpenImport = () => {
+    setImportType(activeTab === 'medication' ? 'medication' : 'appointment');
+    setShowImportModal(true);
+  };
+
+  const handleImportMedication = async (file: File) => {
+    if (!activeUserId) throw new Error('Không xác định được người dùng');
+    const res = await medicationApi.importFromExcel(activeUserId, file);
+    fetchData();
+    return res.data;
+  };
+
+  const handleImportAppointment = async (file: File) => {
+    if (!activeUserId) throw new Error('Không xác định được người dùng');
+    const res = await appointmentApi.importFromExcel(activeUserId, file);
+    fetchData();
+    return res.data;
+  };
+
+  const medicationTemplateData = [
+    {
+      'Tên thuốc': 'Aspirin',
+      'Liều lượng (số)': 100,
+      'Đơn vị': 'mg',
+      'Số lần/ngày': 2,
+      'Giờ uống (HH:mm, cách nhau bằng dấu phẩy)': '08:00,20:00',
+      'Hướng dẫn': 'Uống sau ăn',
+      'Ngày bắt đầu (yyyy-MM-dd)': '2026-06-01',
+      'Ngày kết thúc (yyyy-MM-dd)': '2026-12-31',
+    },
+  ];
+
+  const appointmentTemplateData = [
+    {
+      'Tên bác sĩ': 'BS. Nguyễn Văn A',
+      'Địa điểm': 'Bệnh viện Bạch Mai',
+      'Ngày giờ khám (yyyy-MM-dd HH:mm)': '2026-06-15 09:00',
+      'Ghi chú': 'Mang theo hồ sơ bệnh án',
+    },
+  ];
+
+  const handleEditMed = (id: string) => {
+    setEditMedId(id);
+    setShowMedForm(true);
+  };
+
+  const handleDeleteMed = async (id: string) => {
+    if (window.confirm(t('confirm_delete') || 'Bạn có chắc chắn muốn xoá?')) {
+      try {
+        await medicationService.deleteMedication(id);
+        toast.success(t('delete_success') || 'Đã xoá thành công');
+        
+        // Emit socket event for real-time sync
+        socketService.emitMedicationDeleted(id, activeUserId);
+        
+        fetchData();
+      } catch {
+        toast.error(t('delete_error') || 'Xoá thất bại');
+      }
+    }
+  };
+
+  const handleEditAppt = (apt: AppointmentItem) => {
+    setEditAppt(apt);
+    setShowApptForm(true);
+  };
+
+  const handleDeleteAppt = async (id: string) => {
+    if (window.confirm(t('confirm_delete') || 'Bạn có chắc chắn muốn xoá?')) {
+      try {
+        await appointmentApi.delete(id);
+        toast.success(t('delete_success') || 'Đã xoá thành công');
+        
+        // Emit socket event for real-time sync
+        socketService.emitAppointmentDeleted(id, activeUserId);
+        
+        fetchData();
+      } catch {
+        toast.error(t('delete_error') || 'Xoá thất bại');
+      }
     }
   };
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="schedule-page">
-      {/* Header */}
       <div className="schedule-header">
         <div className="header-with-user">
           <h1>{t('health_schedule')}</h1>
@@ -259,7 +383,6 @@ export const HealthSchedulePage = () => {
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="schedule-tabs">
         <button
           className={`tab-btn ${activeTab === 'medication' ? 'active' : ''}`}
@@ -276,42 +399,48 @@ export const HealthSchedulePage = () => {
       </div>
 
       <div className="schedule-body">
-        {/* ── Left Panel ── */}
         <div className="schedule-left">
-
-          {/* Action Buttons */}
           <div className="schedule-actions">
             <button className="action-btn primary" onClick={handleManualInput}>
               <Plus size={16} /> {t('manual_input')}
             </button>
-            {/* <button className="action-btn secondary">
-              <Upload size={16} /> Import từ File (Word/Excel)
-            </button> */}
+            <button className="action-btn secondary" onClick={handleOpenImport}>
+              <FileSpreadsheet size={16} /> {t('Nhập từ file Excel') || 'Import Excel'}
+            </button>
           </div>
 
-          {/* Week Calendar */}
           <div className="week-calendar">
             <div className="week-nav">
-              <button onClick={() => setWeekOffset(w => w - 1)}><ChevronLeft size={18} /></button>
+              <button onClick={() => setMonthOffset(m => m - 1)}><ChevronLeft size={18} /></button>
               <span className="week-label">
-                {weekDates[0].getDate()}/{weekDates[0].getMonth() + 1}
-                {' – '}
-                {weekDates[6].getDate()}/{weekDates[6].getMonth() + 1}
+                Tháng {new Date(new Date().getFullYear(), new Date().getMonth() + monthOffset).getMonth() + 1} / {new Date(new Date().getFullYear(), new Date().getMonth() + monthOffset).getFullYear()}
               </span>
-              <button onClick={() => setWeekOffset(w => w + 1)}><ChevronRight size={18} /></button>
+              <button onClick={() => setMonthOffset(m => m + 1)}><ChevronRight size={18} /></button>
             </div>
 
-            <div className="week-days">
-              {DAYS.map((label, i) => {
-                const d = weekDates[i];
-                const isSelected = i === selectedDayIndex;
+            <div className="month-days-header">
+              {DAYS.map(label => (
+                <div key={label} className="day-header-label">{label}</div>
+              ))}
+            </div>
+
+            <div className="month-grid">
+              {monthDates.map((d, i) => {
+                const isSelected = isSameDay(d, selectedDate);
                 const isToday = isSameDay(d, new Date());
-                // dot nếu ngày đó có dữ liệu
+                const isCurrentMonth = d.getMonth() === new Date(new Date().getFullYear(), new Date().getMonth() + monthOffset).getMonth();
+                
                 const hasMed = medications.some(med => {
                   if (med.status !== 'Active') return false;
-                  const start = new Date(med.startDate); start.setHours(0, 0, 0, 0);
-                  const end = med.endDate ? new Date(med.endDate) : null;
-                  if (end) end.setHours(23, 59, 59, 999);
+                  const startStr = med.startDate.substring(0, 10);
+                  const [sy, sm, sd] = startStr.split('-').map(Number);
+                  const start = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+                  let end: Date | null = null;
+                  if (med.endDate) {
+                    const endStr = med.endDate.substring(0, 10);
+                    const [ey, em, ed] = endStr.split('-').map(Number);
+                    end = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+                  }
                   const dd = new Date(d); dd.setHours(12, 0, 0, 0);
                   return dd >= start && (!end || dd <= end);
                 });
@@ -321,10 +450,9 @@ export const HealthSchedulePage = () => {
                 return (
                   <button
                     key={i}
-                    className={`day-btn ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
-                    onClick={() => setSelectedDayIndex(i)}
+                    className={`day-btn ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''} ${!isCurrentMonth ? 'other-month' : ''}`}
+                    onClick={() => setSelectedDateState(d)}
                   >
-                    <span className="day-label">{label}</span>
                     <span className="day-date">{d.getDate()}</span>
                     {(hasMed || hasApt) && !isSelected && <span className="day-dot" />}
                   </button>
@@ -333,7 +461,6 @@ export const HealthSchedulePage = () => {
             </div>
           </div>
 
-          {/* Schedule List */}
           <div className="schedule-list">
             <h3 className="list-heading">
               {selectedDate.toLocaleDateString(i18n.language === 'vn' ? 'vi-VN' : 'en-US', { weekday: 'long', day: 'numeric', month: 'numeric' })}
@@ -342,12 +469,10 @@ export const HealthSchedulePage = () => {
             {loading && <p className="empty-msg">{t('loading_data')}</p>}
             {error && <p className="empty-msg error">{error}</p>}
 
-            {/* ── Tab: Lịch uống thuốc ── */}
             {!loading && activeTab === 'medication' && (
-              todayMeds.length === 0
+              sortedTodayMeds.length === 0
                 ? <p className="empty-msg">{t('no_meds_day')}</p>
-                : todayMeds.flatMap(med =>
-                  getMedTimes(med).map((time, idx) => {
+                : sortedTodayMeds.map(({ med, time, idx }) => {
                     const statusInfo = getMedReminderStatusInfo(med.id, time);
                     return (
                       <div className="schedule-item" key={`${med.id}-${idx}`}>
@@ -362,17 +487,23 @@ export const HealthSchedulePage = () => {
                         <div className={`item-status ${statusInfo.className}`}>
                           {statusInfo.text}
                         </div>
+                        <div className="item-actions">
+                          <button className="action-icon-btn" onClick={() => handleEditMed(med.id)} title={t('edit') || 'Sửa'}>
+                            <Edit2 size={16} />
+                          </button>
+                          <button className="action-icon-btn delete" onClick={() => handleDeleteMed(med.id)} title={t('delete') || 'Xoá'}>
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </div>
                     );
                   })
-                )
             )}
 
-            {/* ── Tab: Lịch khám ── */}
             {!loading && activeTab === 'appointment' && (
-              todayApts.length === 0
+              sortedTodayApts.length === 0
                 ? <p className="empty-msg">{t('no_appts_day')}</p>
-                : todayApts.map(apt => (
+                : sortedTodayApts.map(apt => (
                   <div className="schedule-item" key={apt.id}>
                     <div className="item-time">{formatTime(apt.appointmentDate)}</div>
                     <div className="item-info">
@@ -386,63 +517,69 @@ export const HealthSchedulePage = () => {
                         ? <><CheckCircle2 size={13} /> {t('completed')}</>
                         : <><Clock size={13} /> {t('pending')}</>}
                     </div>
+                    <div className="item-actions">
+                      <button className="action-icon-btn" onClick={() => handleEditAppt(apt)} title={t('edit') || 'Sửa'}>
+                        <Edit2 size={16} />
+                      </button>
+                      <button className="action-icon-btn delete" onClick={() => handleDeleteAppt(apt.id)} title={t('delete') || 'Xoá'}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))
             )}
           </div>
         </div>
 
-        {/* ── Right Panel — Import ── */}
-        <div className="schedule-right">
-          <div
-            className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
-            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleFileDrop}
-          >
-            <Upload size={36} className="upload-icon" />
-            <p>{t('drag_drop_file')}</p>
-            <label className="upload-link">
-              {t('choose_file')}
-              <input
-                type="file"
-                accept=".doc,.docx,.xls,.xlsx"
-                hidden
-                onChange={handleFileInput}
-              />
-            </label>
+        {/* <div className="schedule-right">
+          <div className="import-info-card">
+            <FileSpreadsheet size={32} className="import-info-icon" />
+            <h3>{t('EXCEL') || 'Import từ Excel'}</h3>
+            <p>
+              {activeTab === 'medication'
+                ? (t('Nhập danh sách thuốc từ file excel') || 'Nhập danh sách thuốc hàng loạt từ file Excel.')
+                : (t('Nhập danh sách lịch khám từ file excel') || 'Nhập danh sách lịch khám hàng loạt từ file Excel.')}
+            </p>
+            <button className="action-btn secondary" onClick={handleOpenImport}>
+              <Upload size={16} /> {t('Tải excel lên') || 'Import Excel'}
+            </button>
           </div>
-
-          <div className="upload-selected">
-            {t('selected_file')} {selectedFile ? selectedFile.name : t('none')}
-          </div>
-
-          <button
-            className="upload-btn"
-            disabled={!selectedFile}
-            onClick={() => alert(`Upload: ${selectedFile?.name}`)}
-          >
-            {t('upload')}
-          </button>
-        </div>
+        </div> */}
       </div>
 
-      {/* Manual Input Forms */}
       <MedicationForm
         isOpen={showMedForm}
-        onClose={() => setShowMedForm(false)}
-        editingId={null}
+        onClose={() => { setShowMedForm(false); setEditMedId(null); }}
+        editingId={editMedId}
         medications={medications}
         onSuccess={fetchData}
-        userId={targetUserId || undefined}
+        userId={activeUserId}
       />
 
       <AppointmentForm
         isOpen={showApptForm}
-        onClose={() => setShowApptForm(false)}
-        editingAppointment={null}
+        onClose={() => { setShowApptForm(false); setEditAppt(null); }}
+        editingAppointment={editAppt ? {
+          ...editAppt,
+          status: editAppt.status as 'Completed' | 'Upcoming' | 'Missed' | 'Cancelled' | undefined,
+        } : null}
         onSuccess={fetchData}
-        userId={targetUserId || undefined}
+        userId={activeUserId}
+      />
+
+      {/* Import Excel Modal */}
+      <ImportExcelModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImport={importType === 'medication' ? handleImportMedication : handleImportAppointment}
+        title={importType === 'medication'
+          ? (t('Tải danh sách thuôc') || 'Import danh sách thuốc')
+          : (t('Tải danh sách lịch khám') || 'Import lịch khám')}
+        description={importType === 'medication'
+          ? (t('') || 'Tải lên file Excel chứa danh sách thuốc.')
+          : (t('') || 'Tải lên file Excel chứa danh sách lịch khám.')}
+        templateData={importType === 'medication' ? medicationTemplateData : appointmentTemplateData}
+        templateFilename={importType === 'medication' ? 'template_thuoc.csv' : 'template_lich_kham.csv'}
       />
     </div>
   );

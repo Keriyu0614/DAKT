@@ -14,14 +14,17 @@ class _QuickHealthEntryScreenState extends State<QuickHealthEntryScreen> {
   final _systolicController = TextEditingController();
   final _diastolicController = TextEditingController();
   final _heartRateController = TextEditingController();
+  final _weightController = TextEditingController();
 
   final _systolicFocusNode = FocusNode();
   final _diastolicFocusNode = FocusNode();
   final _heartRateFocusNode = FocusNode();
+  final _weightFocusNode = FocusNode();
 
   String? _systolicError;
   String? _diastolicError;
   String? _heartRateError;
+  String? _weightError;
 
   bool _isSaving = false;
 
@@ -39,9 +42,11 @@ class _QuickHealthEntryScreenState extends State<QuickHealthEntryScreen> {
     _systolicController.dispose();
     _diastolicController.dispose();
     _heartRateController.dispose();
+    _weightController.dispose();
     _systolicFocusNode.dispose();
     _diastolicFocusNode.dispose();
     _heartRateFocusNode.dispose();
+    _weightFocusNode.dispose();
     super.dispose();
   }
 
@@ -50,10 +55,12 @@ class _QuickHealthEntryScreenState extends State<QuickHealthEntryScreen> {
       _systolicError = null;
       _diastolicError = null;
       _heartRateError = null;
+      _weightError = null;
 
       final sysText = _systolicController.text.trim();
       final diaText = _diastolicController.text.trim();
       final hrText = _heartRateController.text.trim();
+      final wtText = _weightController.text.trim();
 
       if (sysText.isNotEmpty) {
         final sys = int.tryParse(sysText);
@@ -75,21 +82,29 @@ class _QuickHealthEntryScreenState extends State<QuickHealthEntryScreen> {
           _heartRateError = 'Nhịp tim phải từ 30 đến 200 bpm';
         }
       }
+
+      if (wtText.isNotEmpty) {
+        final wt = double.tryParse(wtText);
+        if (wt == null || wt < 20 || wt > 300) {
+          _weightError = 'Cân nặng phải từ 20 đến 300 kg';
+        }
+      }
     });
   }
 
   Future<void> _handleSave() async {
     _validateFields();
 
-    if (_systolicError != null || _diastolicError != null || _heartRateError != null) {
+    if (_systolicError != null || _diastolicError != null || _heartRateError != null || _weightError != null) {
       return;
     }
 
     final sysText = _systolicController.text.trim();
     final diaText = _diastolicController.text.trim();
     final hrText = _heartRateController.text.trim();
+    final wtText = _weightController.text.trim();
 
-    if (sysText.isEmpty && diaText.isEmpty && hrText.isEmpty) {
+    if (sysText.isEmpty && diaText.isEmpty && hrText.isEmpty && wtText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Vui lòng nhập ít nhất một chỉ số sức khỏe để lưu'),
@@ -104,11 +119,13 @@ class _QuickHealthEntryScreenState extends State<QuickHealthEntryScreen> {
     final systolic = sysText.isNotEmpty ? int.tryParse(sysText) : null;
     final diastolic = diaText.isNotEmpty ? int.tryParse(diaText) : null;
     final heartRate = hrText.isNotEmpty ? int.tryParse(hrText) : null;
+    final weight = wtText.isNotEmpty ? double.tryParse(wtText) : null;
 
     final success = await HealthService.addHealthLog(
       systolic: systolic,
       diastolic: diastolic,
       heartRate: heartRate,
+      weight: weight,
     );
 
     setState(() => _isSaving = false);
@@ -190,6 +207,16 @@ class _QuickHealthEntryScreenState extends State<QuickHealthEntryScreen> {
                 focusNode: _heartRateFocusNode,
                 errorText: _heartRateError,
                 hintText: '---',
+                nextFocusNode: _weightFocusNode,
+              ),
+              const SizedBox(height: 24),
+              _buildLargeInputField(
+                label: 'Cân nặng (kg)',
+                controller: _weightController,
+                focusNode: _weightFocusNode,
+                errorText: _weightError,
+                hintText: '---',
+                isDecimal: true,
                 isLast: true,
               ),
               const SizedBox(height: 40),
@@ -231,6 +258,7 @@ class _QuickHealthEntryScreenState extends State<QuickHealthEntryScreen> {
     required String hintText,
     FocusNode? nextFocusNode,
     bool isLast = false,
+    bool isDecimal = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -247,7 +275,9 @@ class _QuickHealthEntryScreenState extends State<QuickHealthEntryScreen> {
         TextField(
           controller: controller,
           focusNode: focusNode,
-          keyboardType: TextInputType.number,
+          keyboardType: isDecimal
+              ? const TextInputType.numberWithOptions(decimal: true)
+              : TextInputType.number,
           style: const TextStyle(
             fontSize: 34, // Minimum 32sp for input value
             fontWeight: FontWeight.bold,

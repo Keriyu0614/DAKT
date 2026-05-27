@@ -14,46 +14,49 @@ const HealthHistoryItem = ({ log, onEdit, getStatus }: HealthHistoryItemProps) =
     return (
         <div className="history-item" onClick={() => onEdit(log)} style={{ cursor: 'pointer' }}>
             <div className="history-date">
-                {new Date(log.date).toLocaleDateString()}<br />
-                <span style={{ fontWeight: 400, fontSize: '0.8rem' }}>
+                <span>{new Date(log.date).toLocaleDateString()}</span>
+                <span style={{ fontWeight: 500, fontSize: '13px', color: '#64748b' }}>
                     {new Date(log.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 {log.recordedBy === 'self' && (
-                    <div style={{
-                        marginTop: '4px',
+                    <span style={{
                         display: 'inline-block',
                         backgroundColor: '#dcfce7',
                         color: '#15803d',
-                        fontSize: '0.75rem',
+                        fontSize: '11px',
                         fontWeight: 700,
-                        padding: '2px 8px',
+                        padding: '3px 8px',
                         borderRadius: '12px',
-                        border: '1px solid #bbf7d0'
+                        marginTop: '4px',
+                        width: 'fit-content'
                     }}>
                         Tự ghi
-                    </div>
+                    </span>
                 )}
             </div>
-            <div className="history-metrics">
-                <div className="history-metric">
-                    <span className="history-metric-label">BP (mmHg)</span>
-                    <span className={`history-metric-value ${getStatus('bloodPressure', bp)}`}>
-                        {bp || '--'}
-                    </span>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                <div className="history-metrics">
+                    <div className="history-metric">
+                        <span className="history-metric-label">Huyết áp</span>
+                        <span className={`history-metric-value ${getStatus('bloodPressure', bp)}`}>
+                            {bp || '--'}
+                        </span>
+                    </div>
+                    <div className="history-metric">
+                        <span className="history-metric-label">Nhịp tim</span>
+                        <span className={`history-metric-value ${getStatus('heartRate', hr)}`}>
+                            {hr || '--'}
+                        </span>
+                    </div>
+                    <div className="history-metric">
+                        <span className="history-metric-label">Cân nặng</span>
+                        <span className={`history-metric-value ${getStatus('weight', w)}`}>
+                            {w || '--'}
+                        </span>
+                    </div>
                 </div>
-                <div className="history-metric">
-                    <span className="history-metric-label">HR (bpm)</span>
-                    <span className={`history-metric-value ${getStatus('heartRate', hr)}`}>
-                        {hr || '--'}
-                    </span>
-                </div>
-                <div className="history-metric">
-                    <span className="history-metric-label">Weight (kg)</span>
-                    <span className={`history-metric-value ${getStatus('weight', w)}`}>
-                        {w || '--'}
-                    </span>
-                </div>
-                {log.note && <div className="history-note">{log.note}</div>}
+                {log.note && <div className="history-note">Ghi chú: {log.note}</div>}
             </div>
         </div>
     );

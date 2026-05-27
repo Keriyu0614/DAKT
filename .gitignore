@@ -1,18 +1,19 @@
 # Logs
 *.log
 logs/
-bin/
-obj/
 
-# Temporary / Debug files
-*_error.txt
-*_debug*.txt
-debug/
+# .NET
+**/[Bb]in/
+**/[Oo]bj/
+*.userprefs
+*.user
+[Dd]ebug/
+[Rr]elease/
 
 # Node modules
-node_modules/
-dist/
-dist-ssr/
+**/node_modules/
+**/dist/
+**/dist-ssr/
 *.local
 
 # Editor files
@@ -25,5 +26,42 @@ dist-ssr/
 *.sw?
 .vs/
 *.zip
+
+# Flutter/Dart
 **/build/
-node_modules/
+**/.dart_tool/
+.packages
+.pub-cache/
+.pub/
+/mobile-app/elderly_care_app/android/app/build/
+/mobile-app/elderly_care_app/ios/Flutter/App.framework
+/mobile-app/elderly_care_app/ios/Flutter/Flutter.framework
+/mobile-app/elderly_care_app/ios/Flutter/Flutter.podspec
+/mobile-app/elderly_care_app/ios/Flutter/Generated.xcconfig
+/mobile-app/elderly_care_app/ios/Flutter/app.flx
+/mobile-app/elderly_care_app/ios/Flutter/app.zip
+/mobile-app/elderly_care_app/ios/Flutter/flutter_assets/
+/mobile-app/elderly_care_app/ios/Flutter/flutter_export_environment.sh
+/mobile-app/elderly_care_app/ios/ServiceDefinitions.json
+/mobile-app/elderly_care_app/ios/Runner/GeneratedPluginRegistrant.*
+
+# Sensitive files / API Keys
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+appsettings.local.json
+appsettings.Development.json
+
+# Flutter API Config (contains sensitive keys)
+/mobile-app/elderly_care_app/lib/config/api_config.dart
+
+# Keys and Keystores
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.pem
+*.key

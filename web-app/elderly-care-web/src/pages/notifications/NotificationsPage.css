@@ -15,6 +15,13 @@
     margin-bottom: 32px;
 }
 
+.notifications-header .header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+}
+
 .notifications-header h1 {
     display: flex;
     align-items: center;
@@ -29,6 +36,35 @@
     font-size: 16px;
     color: #64748b;
     margin: 0;
+}
+
+/* --- Connection Status --- */
+.connection-status {
+    display: flex;
+    align-items: center;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.status-badge.connected {
+    background-color: #ecfdf5;
+    color: #10b981;
+    border: 1px solid #10b981;
+}
+
+.status-badge.disconnected {
+    background-color: #fef2f2;
+    color: #ef4444;
+    border: 1px solid #ef4444;
 }
 
 /* --- Content Area --- */

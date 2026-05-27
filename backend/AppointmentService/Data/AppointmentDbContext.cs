@@ -20,7 +20,6 @@ namespace AppointmentService.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.DoctorName).IsRequired();
                 entity.Property(e => e.UserId).IsRequired();
-                entity.Property(e => e.Location).IsRequired();
             });
         }
     }

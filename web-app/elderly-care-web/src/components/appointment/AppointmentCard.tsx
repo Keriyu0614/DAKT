@@ -68,24 +68,24 @@ const AppointmentCard = ({
                     )}
                     <div className="appointment-location">
                         {apt.isTelehealth ? <Video size={18} /> : <MapPin size={18} />}
-                        {apt.location || (apt.isTelehealth ? 'Telehealth' : 'Location not specified')}
+                        {apt.location || (apt.isTelehealth ? 'Khám từ xa' : 'Chưa có địa điểm')}
                     </div>
                 </div>
 
                 <div className="appointment-actions">
                     <button className="btn-action btn-details" onClick={() => onViewDetails(apt)}>
-                        View Details
+                        Xem chi tiết
                     </button>
                     {status === 'upcoming' && (
                         <>
                             <button className="btn-action btn-edit" onClick={() => onEdit(apt)}>
-                                Edit
+                                Sửa
                             </button>
                             <button
                                 className="btn-action btn-cancel-appt"
                                 onClick={() => onCancel(apt)}
                             >
-                                Cancel Visit
+                                Hủy lịch khám
                             </button>
                         </>
                     )}

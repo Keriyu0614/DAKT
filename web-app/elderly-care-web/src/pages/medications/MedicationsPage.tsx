@@ -4,6 +4,7 @@ import { medicationService } from '../../services/medication.service';
 import { type Medication } from '../../api/medication.api';
 import MedicationCard from '../../components/medication/MedicationCard';
 import MedicationForm from '../../components/medication/MedicationForm';
+import { useAuth } from '../../context/AuthContext';
 import './MedicationsPage.css';
 import {
     Pill,
@@ -17,6 +18,13 @@ import { toast } from 'react-toastify';
 
 export const MedicationsPage = () => {
     const { t } = useTranslation();
+    const { user, managedElderly } = useAuth();
+    const activeUserId = managedElderly?.id || user?.id;
+
+    console.log('[MedicationsPage] user:', user);
+    console.log('[MedicationsPage] managedElderly:', managedElderly);
+    console.log('[MedicationsPage] activeUserId:', activeUserId);
+
     // --- State ---
     const [medications, setMedications] = useState<Medication[]>([]);
     const [loading, setLoading] = useState(true);
@@ -30,12 +38,12 @@ export const MedicationsPage = () => {
     // --- Data Fetching ---
     useEffect(() => {
         fetchMedications();
-    }, []);
+    }, [activeUserId]);
 
     const fetchMedications = async () => {
         setLoading(true);
         try {
-            const data = await medicationService.getMedications();
+            const data = await medicationService.getMedications(activeUserId);
             setMedications(data);
             setError('');
         } catch (err) {
@@ -193,6 +201,7 @@ export const MedicationsPage = () => {
                 editingId={editingId}
                 medications={medications}
                 onSuccess={fetchMedications}
+                userId={activeUserId}
             />
         </div>
     );

@@ -1,3 +1,5 @@
+#.\run_project.ps1
+#Dùng khi setup lại từ đầu (xóa database)
 # Automation Script for Elderly Care Reminder System
 
 Write-Host "--- Bắt đầu thiết lập hệ thống Elderly Care ---" -ForegroundColor Cyan

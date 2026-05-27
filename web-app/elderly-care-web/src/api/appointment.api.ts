@@ -27,4 +27,12 @@ export const appointmentApi = {
 
   delete: (id: string) =>
     axiosClient.delete(`/api/appointments/${id}`),
+
+  importFromExcel: (userId: string, file: File): Promise<import("axios").AxiosResponse<{ message: string; importedCount: number; errors?: string[] }>> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return axiosClient.post(`/api/appointments/import/${userId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 };

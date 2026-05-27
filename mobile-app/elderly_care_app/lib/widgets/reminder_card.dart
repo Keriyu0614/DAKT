@@ -1,4 +1,3 @@
-//elderly-care-web\src\widgets\reminder_card.dart
 import 'package:flutter/material.dart';
 import '../main.dart';
 

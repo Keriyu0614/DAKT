@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -53,21 +54,45 @@ class _LoginScreenState extends State<LoginScreen>
 
     setState(() => _isLoading = true);
     
-    final success = await AuthService.login(
+    final result = await AuthService.login(
       _emailController.text.trim(),
       _passwordController.text,
     );
 
     if (mounted) {
       setState(() => _isLoading = false);
-      if (success) {
+      if (result['success'] == true) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
+      } else if (result['blocked'] == true) {
+        // Show dialog for blocked caregiver
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.block_rounded, color: Colors.orange, size: 28),
+                SizedBox(width: 8),
+                Text('Không thể đăng nhập', style: TextStyle(fontSize: 18)),
+              ],
+            ),
+            content: Text(
+              result['message'] ?? 'Tài khoản này không được phép đăng nhập vào ứng dụng.',
+              style: const TextStyle(fontSize: 15, height: 1.5),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Đã hiểu', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.')),
+          SnackBar(content: Text(result['message'] ?? 'Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.')),
         );
       }
     }
@@ -106,33 +131,15 @@ class _LoginScreenState extends State<LoginScreen>
                   Center(
                     child: Column(
                       children: [
-                        Container(
-                          width: 88,
+                        Image.asset(
+                          'assets/images/CareLink.png',
                           height: 88,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppTheme.primary.withOpacity(0.35),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.favorite_rounded,
-                            color: Colors.white,
-                            size: 44,
-                          ),
+                          width: 88,
+                          fit: BoxFit.contain,
                         ),
                         const SizedBox(height: 16),
                         const Text(
-                          'CareRemind',
+                          'CareLink',
                           style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w800,
@@ -172,23 +179,25 @@ class _LoginScreenState extends State<LoginScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Đăng nhập',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: AppTheme.textPrimary,
+                        const Center(
+                          child: Text(
+                            'Đăng nhập',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.textPrimary,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
-                          'Chào mừng bạn quay trở lại!',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 28),
+                        // const Text(
+                        //   'Chào mừng bạn quay trở lại!',
+                        //   style: TextStyle(
+                        //     fontSize: 15,
+                        //     color: AppTheme.textSecondary,
+                        //   ),
+                        // ),
+                        // const SizedBox(height: 28),
 
                         // Email field
                         _buildLabel('Email'),
@@ -254,7 +263,44 @@ class _LoginScreenState extends State<LoginScreen>
                               : const Text('Đăng nhập'),
                         ),
                         const SizedBox(height: 16),
-                        
+
+                        // Register button
+                        OutlinedButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const RegisterScreen(),
+                                    ),
+                                  );
+                                },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            side: const BorderSide(color: AppTheme.primary),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.person_add_rounded, color: AppTheme.primary),
+                              SizedBox(width: 12),
+                              Text(
+                                'Đăng ký tài khoản',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         // Skip Login button
                         OutlinedButton(
                           onPressed: _isLoading ? null : _loginAsGuest,
@@ -287,32 +333,32 @@ class _LoginScreenState extends State<LoginScreen>
                   const SizedBox(height: 24),
 
                   // Help text for elderly
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryLight,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.help_outline_rounded,
-                            color: AppTheme.primary, size: 22),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Text(
-                            'Cần hỗ trợ? Gọi cho người thân hoặc liên hệ 1800-xxxx',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
+                  // Container(
+                  //   padding: const EdgeInsets.all(16),
+                  //   decoration: BoxDecoration(
+                  //     color: AppTheme.primaryLight,
+                  //     borderRadius: BorderRadius.circular(16),
+                  //     border: Border.all(color: AppTheme.primary.withOpacity(0.15)),
+                  //   ),
+                  //   // child: Row(
+                  //   //   children: [
+                  //   //     const Icon(Icons.help_outline_rounded,
+                  //   //         color: AppTheme.primary, size: 22),
+                  //   //     const SizedBox(width: 12),
+                  //   //     // const Expanded(
+                  //   //     //   child: Text(
+                  //   //     //     'Cần hỗ trợ? Gọi cho người thân hoặc liên hệ 1800-xxxx',
+                  //   //     //     style: TextStyle(
+                  //   //     //       fontSize: 14,
+                  //   //     //       color: AppTheme.primary,
+                  //   //     //       fontWeight: FontWeight.w500,
+                  //   //     //     ),
+                  //   //     //   ),
+                  //   //     // ),
+                  //   //   ],
+                  //   // ),
+                  // ),
+                  // const SizedBox(height: 32),
                 ],
               ),
             ),

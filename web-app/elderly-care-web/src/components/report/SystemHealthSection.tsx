@@ -1,10 +1,23 @@
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+} from 'recharts';
+import { AlertTriangle } from 'lucide-react';
 import type { ComprehensiveReport } from '../../types/report.types';
+import { chartHelpers } from '../../utils/report.charts';
 
 interface SystemHealthSectionProps {
     data: ComprehensiveReport;
 }
 
 const SystemHealthSection = ({ data }: SystemHealthSectionProps) => {
+    const { colors } = chartHelpers;
+
     return (
         <div className="report-section slide-in">
             <div className="section-header">
@@ -36,8 +49,32 @@ const SystemHealthSection = ({ data }: SystemHealthSectionProps) => {
                         <span>Độ Trễ Giao Hàng TB:</span>
                         <strong>{data.systemHealth.averageDelayMs}ms</strong>
                     </div>
+                    <div className="stat-row">
+                        <span>Tổng Lỗi:</span>
+                        <strong className="text-danger">
+                            {data.systemHealth.failuresByReason.reduce((sum, f) => sum + f.count, 0)}
+                        </strong>
+                    </div>
                 </div>
             </div>
+            {data.systemHealth.peakFailureWindows.length > 0 && (
+                <div className="chart-container">
+                    <h3>Khung Giờ Lỗi Cao Điểm</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={data.systemHealth.peakFailureWindows}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="window" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="count" fill={colors.danger} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                    <div className="disclaimer-area">
+                        <AlertTriangle size={16} />
+                        <span>Biểu đồ này giúp xác định các khung giờ có nhiều lỗi nhất để tối ưu hóa hệ thống.</span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
